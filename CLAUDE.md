@@ -45,9 +45,11 @@ UmiJS 4 + React 18 + TypeScript 5 + Ant Design 5 (@umijs/max)
 每次创建/修改代码文件时，必须同步维护：
 
 1. 所在目录的 `README.md`（文件清单表格）
-2. 文件顶部 JSDoc 注释（@description / @module / @dependencies）
+2. 文件顶部 JSDoc 注释（@description / @module / @dependencies / **@prd / @task / @rules**）
 3. 功能模块的模块级 `README.md`（业务流程 + 对外暴露）
 4. `src/README.md` 全局索引
+
+> **业务锚点 (@prd / @task / @rules) 是「需求 → 代码 → 测试」可追溯链的关键**, 让 `/test` 能根据业务规则而非源码行为生成测试, 避免 AI 自己猜预期。详见 `.claude/rules/file-docs.md`。
 
 详细格式与模板 → `.claude/rules/file-docs.md`
 
@@ -71,9 +73,17 @@ UmiJS 4 + React 18 + TypeScript 5 + Ant Design 5 (@umijs/max)
 
 ### docs/ 目录结构
 
+- docs/WORKFLOW.md — **新人/用户必读**, 从一句话需求到上线的五步法操作手册
 - docs/tasks/ — 存放 /plan 命令生成的 JSON 任务清单, 每个文件对应一个功能模块
-- docs/prds/ — 存放产品需求文档 (.md 格式)
-- 详细说明见 docs/README.md
+- docs/prds/ — 存放产品需求文档 (.md 格式), 模板见 docs/prds/_template.md
+- api-spec/ — OpenAPI 契约文件 (后端提供), 通过 `pnpm gen:api` 生成 src/types/api.ts
+- 详细说明见 docs/README.md 和 api-spec/README.md
+
+### API 类型铁律
+
+- API 类型**必须**从 `@/types/api` 导入, **禁止**手写 request/response 类型
+- `src/types/api.ts` 是 `pnpm gen:api` 生成的产物, 不要手改
+- OpenAPI 字段不对要推后端改 `api-spec/openapi.yaml`, 不要前端绕过
 
 ### 任务清单使用方式
 

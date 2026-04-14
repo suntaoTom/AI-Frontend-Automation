@@ -66,6 +66,12 @@
  * @description 用户资料展示组件，支持查看和编辑两种模式
  * @module features/user/components
  * @dependencies useUserData, useAuthStore, Avatar (antd)
+ * @prd docs/prds/user-module.md#用户资料
+ * @task docs/tasks/tasks-user.json#task-012
+ * @rules
+ *   - 非登录用户只能看公开字段 (昵称、头像)
+ *   - 编辑模式下, 手机号需通过 PHONE_REG 校验
+ *   - 保存失败时保留表单内容并提示错误
  * @example
  *   <UserProfile userId="123" editable />
  */
@@ -73,12 +79,30 @@
 
 对于不同类型的文件，注释需包含：
 
-- **组件**: description, module, dependencies, props 说明, example
-- **hooks**: description, module, params, returns, example
-- **stores**: description, module, state 字段说明, actions 说明
-- **utils**: description, module, params, returns, example
-- **api**: description, module, 请求方法, 请求路径, params, returns
+- **组件**: description, module, dependencies, **prd, task, rules**, props 说明, example
+- **hooks**: description, module, **prd, task, rules**, params, returns, example
+- **stores**: description, module, **prd, task, rules**, state 字段说明, actions 说明
+- **utils**: description, module, params, returns, example (纯工具函数通常无需 prd/rules)
+- **api**: description, module, **prd**, 请求方法, 请求路径, params, returns
 - **types**: description, module, 各字段说明
+
+### 业务锚点字段说明 (重要)
+
+`@prd` / `@task` / `@rules` 是「需求 → 代码 → 测试」可追溯链的关键, **编码时必须同步写入**:
+
+| 字段 | 格式 | 作用 |
+|------|------|------|
+| `@prd` | `docs/prds/<文件>.md#<锚点>` | 指向对应的 PRD 片段, 供查阅需求原文 |
+| `@task` | `docs/tasks/<文件>.json#<taskId>` | 指向 `/plan` 生成的任务条目 |
+| `@rules` | 多行中文规则列表, 每行一条 | 本文件承载的**业务规则**, 是测试断言的唯一来源 |
+
+**`@rules` 的写法原则**:
+- 只写**业务规则**, 不写技术实现 (✅「手机号需校验」 ❌「使用 useState 管理表单」)
+- 每条规则都应该可以转化为一个测试用例
+- 如果规则来自 PRD, 尽量保留原文措辞, 便于对齐
+- 无业务规则的纯工具函数可省略 (如 `formatDate`), 但测试预期必须来自函数签名/JSDoc
+
+**测试生成时的作用**: `/test` 命令会读取 `@rules` 作为测试用例骨架, 每条规则对应一个 `it()`, 从根本上避免 AI「根据源码猜预期」的问题。详见 `.claude/commands/test.md`。
 
 ## 触发时机
 

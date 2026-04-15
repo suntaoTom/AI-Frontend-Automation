@@ -21,6 +21,19 @@
 
 3. **如果 PRD 缺少「业务规则」章节**, 提示用户补齐再继续 (没有规则就没法生成靠谱的测试)
 
+4. **硬性闸门: 调用 `/prd-check` 做完备性检查 (不通过则直接停)**
+
+   **必须**先对输入的 PRD 执行 `/prd-check` 命令 (定义在 `.claude/commands/prd-check.md`), 获取检查结果:
+
+   - **通过** → 继续进入「分析步骤」
+   - **不通过** → 直接输出 `/prd-check` 的报错内容, **终止执行**, 不进入任务拆解
+
+   **执行方式**: 作为 `/plan` 的内嵌步骤, 按 `prd-check.md` 定义的 5 项检查全部跑一遍, 规则、输出格式、阻塞判定完全一致。**不要重复实现检查逻辑, 也不要降级或跳过**。
+
+   **为什么单独抽成命令**:
+   - 用户审阅 PRD 过程中可以独立跑 `/prd-check @docs/prds/xxx.md` 实时自检, 不必非要跑 `/plan` 才知道哪里没改完
+   - `/plan` 和 `/prd-check` 共用同一份检查规则, 避免两处分叉
+
 ## 分析步骤
 
 1. **理解需求**: 通读 PRD, 列出所有功能点 + 业务规则
@@ -80,7 +93,7 @@ page       (页面装配)              ← 来源: PRD 交互流程
   "tasks": [
     {
       "taskId": "T001",
-      "type": "gen-api | api | mock | store | hook | component | page",
+      "type": "precondition | gen-api | api | mock | constants | utils | locale | config | model | store | hook | wrapper | component | page",
       "name": "文件名称",
       "filePath": "src/features/xxx/xxx.ts",
       "description": "具体实现要求",

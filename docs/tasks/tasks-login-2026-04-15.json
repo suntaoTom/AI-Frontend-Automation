@@ -1,0 +1,430 @@
+{
+  "moduleName": "用户登录",
+  "moduleCode": "login",
+  "prdRef": "docs/prds/login.md",
+  "summary": "为后台管理系统提供账号密码登录、注册、登出与基于角色的路由守卫, 支持 access/refresh token 静默续期。本迭代不含「忘记密码」(已在 PRD 声明下迭代实现)。",
+  "createdAt": "2026-04-15",
+  "tasks": [
+    {
+      "taskId": "T001",
+      "type": "precondition",
+      "name": "落地 OpenAPI stub 到 openapi.local.json",
+      "filePath": "api-spec/openapi.local.json",
+      "description": "把 docs/prds/login.md「接口提议」章节中 5 个 stub (login / getCurrentUser / refreshToken / logout / register) 合并进 api-spec/openapi.local.json。后端正式实现后从 local.json 移除并合并到主 openapi.json。",
+      "prdRef": "docs/prds/login.md#接口提议-openapi-stub",
+      "businessRules": [],
+      "props": {},
+      "dependencies": [],
+      "reuseComponents": [],
+      "acceptanceCriteria": [
+        "5 个 operationId 在 openapi.local.json 中存在",
+        "schema 字段与 PRD stub 一致, 无字段缺漏",
+        "json 格式合法, 可被 swagger2openapi 解析"
+      ],
+      "status": "pending"
+    },
+    {
+      "taskId": "T002",
+      "type": "gen-api",
+      "name": "生成 API 类型",
+      "filePath": "src/types/api.ts",
+      "description": "运行 pnpm gen:api, 基于 openapi.json + openapi.local.json 生成 src/types/api.ts。后续所有请求函数的入参/出参类型必须从此文件 import paths 提取, 禁止手写。",
+      "prdRef": "docs/prds/login.md#数据契约-引用-openapi",
+      "businessRules": [],
+      "props": {},
+      "dependencies": ["T001"],
+      "reuseComponents": ["scripts/gen-api.mjs"],
+      "acceptanceCriteria": [
+        "src/types/api.ts 中存在 paths['/api/auth/login'] 等 5 个路径定义",
+        "TypeScript 编译通过, 无类型错误",
+        "文件标注为生成产物, 不手改"
+      ],
+      "status": "pending"
+    },
+    {
+      "taskId": "T003",
+      "type": "constants",
+      "name": "auth 模块常量",
+      "filePath": "src/features/auth/constants.ts",
+      "description": "定义路由路径常量 (LOGIN_PATH / REGISTER_PATH / FORBIDDEN_PATH / HOME_PATH)、角色枚举 ROLE (admin/user) 及 ROLE_OPTIONS、错误码枚举 AUTH_ERROR_CODE (40101/40102/40103/40104/40201/40202/50001)、token storage key。所有可变值通过此文件引入, 不在业务代码中硬编码。",
+      "prdRef": "docs/prds/login.md#功能点-1-账号密码登录",
+      "businessRules": [
+        "不做图形验证码校验",
+        "不做连续失败锁定"
+      ],
+      "props": {},
+      "dependencies": ["T002"],
+      "reuseComponents": [],
+      "acceptanceCriteria": [
+        "无 magic number 与硬编码字符串",
+        "ROLE 与 OpenAPI getCurrentUser.role 枚举一致 (admin/user)",
+        "错误码与 PRD 错误码映射表一致",
+        "所有常量使用 as const 收敛字面量类型"
+      ],
+      "status": "pending"
+    },
+    {
+      "taskId": "T004",
+      "type": "utils",
+      "name": "tokenStorage 封装",
+      "filePath": "src/features/auth/utils/tokenStorage.ts",
+      "description": "封装 access/refresh token 在 localStorage 的存取与清空: getAccessToken / setAccessToken / getRefreshToken / setRefreshToken / clearTokens。storage key 从 constants 引入。",
+      "prdRef": "docs/prds/login.md#功能点-1-账号密码登录",
+      "businessRules": [
+        "登录成功后, 全局可访问当前用户信息 (至少包含 userId / username / role)",
+        "无论接口是否成功, 前端都清空本地 access/refresh token 与用户信息"
+      ],
+      "props": {},
+      "dependencies": ["T003"],
+      "reuseComponents": [],
+      "acceptanceCriteria": [
+        "提供 5 个纯函数 API",
+        "SSR 环境安全: 访问 window 前判空",
+        "清空时同时清 access 和 refresh"
+      ],
+      "status": "pending"
+    },
+    {
+      "taskId": "T005",
+      "type": "api",
+      "name": "auth API 请求封装",
+      "filePath": "src/features/auth/api/authApi.ts",
+      "description": "基于 umi-request 封装 5 个请求: login / getCurrentUser / refreshToken / logout / register。入参/出参类型一律从 @/types/api 的 paths 提取, 禁止手写。URL 路径在常量中定义。",
+      "prdRef": "docs/prds/login.md#数据契约-引用-openapi",
+      "businessRules": [
+        "登录成功后, 全局可访问当前用户信息 (至少包含 userId / username / role)",
+        "页面加载时, getInitialState 调用 getCurrentUser 获取当前用户; 未登录 (40101 / 40104) 视为无登录态"
+      ],
+      "props": {},
+      "dependencies": ["T002", "T003"],
+      "reuseComponents": ["@umijs/plugin-request"],
+      "acceptanceCriteria": [
+        "5 个函数全部从 paths 提取入参/出参类型, 无任何手写 interface",
+        "使用 umi-request, 不引入 axios",
+        "错误统一交给 app.ts 的 errorHandler, 函数内不写 try/catch"
+      ],
+      "status": "pending"
+    },
+    {
+      "taskId": "T006",
+      "type": "mock",
+      "name": "auth mock 数据",
+      "filePath": "mock/auth.ts",
+      "description": "提供 /api/auth/login, /api/auth/me, /api/auth/refresh, /api/auth/logout, /api/auth/register 的 mock。内置 admin/admin123 (role=admin) 与 user/user123 (role=user) 两个测试账号。错误账号返回 40101, 已禁用账号返回 40102, 注册重复返回 40201。返回结构必须 import paths 类型对齐 OpenAPI。",
+      "prdRef": "docs/prds/login.md#mock-数据约定",
+      "businessRules": [
+        "账号或密码错误时, 显示「账号或密码错误」, 不区分具体是哪一项错误 (防止账号枚举)",
+        "账号已被占用时, 接口返回 40201, 表单在账号字段显示「该账号已被注册」"
+      ],
+      "props": {},
+      "dependencies": ["T002"],
+      "reuseComponents": ["Umi 内置 mock"],
+      "acceptanceCriteria": [
+        "admin/admin123 与 user/user123 可正常登录, 返回对应 role",
+        "错误账号返回 code=40101",
+        "重复注册返回 code=40201",
+        "mock 出入参类型从 paths 提取, 与 OpenAPI 对齐"
+      ],
+      "status": "pending"
+    },
+    {
+      "taskId": "T007",
+      "type": "locale",
+      "name": "auth 模块国际化文案",
+      "filePath": "src/locales/zh-CN/auth.ts, src/locales/en-US/auth.ts",
+      "description": "登录/注册/登出/路由守卫所有展示文案的国际化 key, 包含: 表单 label/placeholder, 校验失败提示, 错误码对应的提示文案 (账号或密码错误/账号已被禁用/账号已被注册/服务异常等), 注册成功 toast。",
+      "prdRef": "docs/prds/login.md#功能点-1-账号密码登录",
+      "businessRules": [
+        "账号或密码错误时, 显示「账号或密码错误」, 不区分具体是哪一项错误 (防止账号枚举)",
+        "账号已被占用时, 接口返回 40201, 表单在账号字段显示「该账号已被注册」",
+        "注册成功后, 跳转到登录页并 toast「注册成功, 请登录」"
+      ],
+      "props": {},
+      "dependencies": ["T003"],
+      "reuseComponents": ["@umijs/plugin-locale"],
+      "acceptanceCriteria": [
+        "中英两套文案 key 完全对齐",
+        "无中文硬编码出现在组件代码中",
+        "key 命名采用 auth.<scene>.<field> 格式"
+      ],
+      "status": "pending"
+    },
+    {
+      "taskId": "T008",
+      "type": "config",
+      "name": "app.ts 运行时: 拦截器 + initialState",
+      "filePath": "src/app.ts",
+      "description": "扩展 app.ts: (1) request 拦截器在每个请求注入 Authorization: Bearer <accessToken>; (2) 响应拦截器按错误码处理 — 40103 触发静默 refreshToken 后重发原请求 (仅重试 1 次), 40104 清空登录态并跳 /login, 50001 toast「服务异常」, 其他错误码 toast 对应文案; (3) 实现 getInitialState() 启动时调用 getCurrentUser, 失败 (40101/40104) 视为未登录, 返回 currentUser=null。",
+      "prdRef": "docs/prds/login.md#功能点-4-路由守卫与角色权限",
+      "businessRules": [
+        "页面加载时, getInitialState 调用 getCurrentUser 获取当前用户; 未登录 (40101 / 40104) 视为无登录态",
+        "访问令牌 (access token) 过期时, 全局 request 拦截器自动调用 refreshToken 续期一次; 失败则清空登录态并跳 /login",
+        "登录成功后, 全局可访问当前用户信息 (至少包含 userId / username / role)"
+      ],
+      "props": {},
+      "dependencies": ["T004", "T005", "T007"],
+      "reuseComponents": ["@umijs/plugin-request", "@umijs/plugin-initial-state"],
+      "acceptanceCriteria": [
+        "请求自动带 Authorization 头 (有 token 时)",
+        "40103 触发 refresh 后, 原请求被重发, 用户无感",
+        "refresh 失败仅清登录态 + 跳 /login, 不死循环",
+        "getInitialState 返回 { currentUser, fetchUserInfo } 结构"
+      ],
+      "status": "pending"
+    },
+    {
+      "taskId": "T009",
+      "type": "model",
+      "name": "全局 currentUser 模型",
+      "filePath": "src/models/initialState.ts",
+      "description": "声明 @@initialState 类型 InitialState { currentUser: CurrentUser | null; fetchUserInfo: () => Promise<CurrentUser | null> }。CurrentUser 类型从 @/types/api 的 getCurrentUser 响应提取。供页面通过 useModel('@@initialState') 访问。",
+      "prdRef": "docs/prds/login.md#功能点-4-路由守卫与角色权限",
+      "businessRules": [
+        "用户信息通过 @umijs/plugin-initial-state 的 getInitialState 初始化, 在全局通过 useModel('@@initialState') 访问"
+      ],
+      "props": {},
+      "dependencies": ["T002", "T008"],
+      "reuseComponents": ["@umijs/plugin-initial-state"],
+      "acceptanceCriteria": [
+        "CurrentUser 类型来自 paths, 不手写",
+        "未登录时 currentUser === null",
+        "fetchUserInfo 可被 useAuth.login 调用刷新全局态"
+      ],
+      "status": "pending"
+    },
+    {
+      "taskId": "T010",
+      "type": "config",
+      "name": "access 权限定义",
+      "filePath": "src/access.ts",
+      "description": "基于 initialState.currentUser 派生权限: isLogin (currentUser 非空), canAdmin (currentUser?.role === ROLE.ADMIN)。供路由 wrappers 与 <Access> 组件使用。",
+      "prdRef": "docs/prds/login.md#功能点-4-路由守卫与角色权限",
+      "businessRules": [
+        "管理员 (role=admin) 可访问全部页面",
+        "普通用户 (role=user) 访问管理员专属页面时, 跳转到 /403",
+        "角色权限通过 @umijs/plugin-access 的 src/access.ts 定义, 页面通过 wrappers 或 Access 组件校验"
+      ],
+      "props": {},
+      "dependencies": ["T003", "T009"],
+      "reuseComponents": ["@umijs/plugin-access"],
+      "acceptanceCriteria": [
+        "导出 isLogin / canAdmin 两个布尔字段",
+        "无 currentUser 时两者均为 false",
+        "ROLE 字面量从 constants 引入, 不硬编码 'admin'"
+      ],
+      "status": "pending"
+    },
+    {
+      "taskId": "T011",
+      "type": "wrapper",
+      "name": "登录态守卫 wrapper",
+      "filePath": "src/wrappers/auth.tsx",
+      "description": "Umi route wrapper: 读取 useModel('@@initialState').currentUser, 未登录时 <Navigate to={`/login?redirect=${当前路径}`} replace />, 已登录则 <Outlet />。",
+      "prdRef": "docs/prds/login.md#功能点-4-路由守卫与角色权限",
+      "businessRules": [
+        "除 /login / /register / /forgot-password 外, 所有页面均需登录态",
+        "未登录用户访问受保护页面时, 跳转到 /login, 并通过 query 参数 ?redirect=<原路径> 保留原访问目标"
+      ],
+      "props": {
+        "无 (route wrapper, 通过 Outlet 渲染子路由)": ""
+      },
+      "dependencies": ["T009"],
+      "reuseComponents": ["@umijs/max Navigate", "@umijs/max Outlet"],
+      "acceptanceCriteria": [
+        "未登录访问 /list → 跳 /login?redirect=/list",
+        "已登录直接渲染子路由内容",
+        "redirect 参数做 encodeURIComponent 防注入"
+      ],
+      "status": "pending"
+    },
+    {
+      "taskId": "T012",
+      "type": "hook",
+      "name": "useAuth",
+      "filePath": "src/features/auth/hooks/useAuth.ts",
+      "description": "封装登录态相关动作: login(values) → 调 authApi.login → 写 token → 触发 fetchUserInfo → 跳 redirect 或 /; logout() → 调 authApi.logout (无视失败) → 清 token → 清 currentUser → 跳 /login; register(values) → 调 authApi.register → 跳 /login + toast。返回 { login, logout, register, loading }。",
+      "prdRef": "docs/prds/login.md#功能点-1-账号密码登录",
+      "businessRules": [
+        "登录成功后, 固定跳转到首页 /",
+        "登录成功后, 全局可访问当前用户信息 (至少包含 userId / username / role)",
+        "勾选「记住我」时, refresh token 有效期延长 (例: 7 天 → 30 天); 不勾选则使用默认有效期",
+        "点击登出后, 调用 /api/auth/logout 使服务端 token 失效",
+        "无论接口是否成功, 前端都清空本地 access/refresh token 与用户信息",
+        "登出后跳转到 /login",
+        "注册成功后, 跳转到登录页并 toast「注册成功, 请登录」"
+      ],
+      "props": {
+        "返回值": {
+          "login": "(values: LoginParams) => Promise<void>",
+          "logout": "() => Promise<void>",
+          "register": "(values: RegisterParams) => Promise<void>",
+          "loading": "boolean"
+        }
+      },
+      "dependencies": ["T004", "T005", "T009"],
+      "reuseComponents": ["@umijs/max useModel", "@umijs/max history", "antd message"],
+      "acceptanceCriteria": [
+        "登录成功优先跳 query.redirect, 否则 /",
+        "logout 在接口失败时仍清 token + 跳 login",
+        "loading 在请求期间为 true, 完成后为 false",
+        "register 成功后 toast 文案使用国际化 key"
+      ],
+      "status": "pending"
+    },
+    {
+      "taskId": "T013",
+      "type": "component",
+      "name": "LoginForm",
+      "filePath": "src/features/auth/components/LoginForm.tsx",
+      "description": "登录表单组件: 账号 + 密码 + 「记住我」复选框 + 登录按钮 + 注册入口链接。使用 antd Form 内置校验, 校验规则常量化。表单上方支持显示来自父组件的服务端错误文案 (errorMessage prop)。",
+      "prdRef": "docs/prds/login.md#功能点-1-账号密码登录",
+      "businessRules": [
+        "账号或密码为空时, 登录按钮禁用",
+        "账号或密码格式不合法时, 表单 inline 显示错误提示, 登录按钮禁用",
+        "账号或密码错误时, 显示「账号或密码错误」, 不区分具体是哪一项错误 (防止账号枚举)",
+        "账号: 4-32 位字母/数字/下划线",
+        "密码: 8-32 位, 必须含字母和数字"
+      ],
+      "props": {
+        "LoginFormProps": {
+          "onSubmit": "(values: LoginParams) => void",
+          "loading": "boolean",
+          "errorMessage": "string | null"
+        }
+      },
+      "dependencies": ["T003", "T007"],
+      "reuseComponents": ["antd Form", "antd Input", "antd Input.Password", "antd Checkbox", "antd Button", "antd Alert"],
+      "acceptanceCriteria": [
+        "字段全空时按钮 disabled=true",
+        "格式不合法时 Form.Item 显示错误, 按钮 disabled=true",
+        "errorMessage 非空时表单上方渲染 antd Alert (type=error)",
+        "loading 时按钮转圈, 表单不可重复提交",
+        "所有文案使用 intl.formatMessage, 无中文硬编码"
+      ],
+      "status": "pending"
+    },
+    {
+      "taskId": "T014",
+      "type": "component",
+      "name": "RegisterForm",
+      "filePath": "src/features/auth/components/RegisterForm.tsx",
+      "description": "注册表单组件: 账号 + 密码 + 确认密码 + 注册按钮 + 返回登录链接。账号字段错误来自父组件 (usernameError prop) 用于展示「该账号已被注册」。",
+      "prdRef": "docs/prds/login.md#功能点-2-用户注册",
+      "businessRules": [
+        "所有必填字段为空时, 注册按钮禁用",
+        "密码与确认密码不一致时, inline 提示「两次密码输入不一致」",
+        "账号已被占用时, 接口返回 40201, 表单在账号字段显示「该账号已被注册」",
+        "账号: 4-32 位字母/数字/下划线",
+        "密码: 8-32 位, 必须含字母和数字"
+      ],
+      "props": {
+        "RegisterFormProps": {
+          "onSubmit": "(values: RegisterParams) => void",
+          "loading": "boolean",
+          "usernameError": "string | null"
+        }
+      },
+      "dependencies": ["T003", "T007"],
+      "reuseComponents": ["antd Form", "antd Input", "antd Input.Password", "antd Button"],
+      "acceptanceCriteria": [
+        "必填字段全空时按钮 disabled=true",
+        "确认密码与密码不一致时 Form.Item 显示 inline 错误",
+        "usernameError 非空时账号字段显示该错误并标红",
+        "所有文案使用 intl.formatMessage"
+      ],
+      "status": "pending"
+    },
+    {
+      "taskId": "T015",
+      "type": "page",
+      "name": "登录页",
+      "filePath": "src/pages/login/index.tsx",
+      "description": "组合 LoginForm + useAuth: 接 onSubmit → useAuth.login, 捕获后端 40101/40102 错误码并通过 errorMessage 传给 LoginForm 显示, 密码字段在 40101 时清空。读取 query.redirect 传入 useAuth。已登录用户访问此页面 → 直接跳 /。",
+      "prdRef": "docs/prds/login.md#功能点-1-账号密码登录",
+      "businessRules": [
+        "登录成功后, 固定跳转到首页 /",
+        "账号或密码错误时, 表单上方显示错误文案, 密码字段清空",
+        "账号被禁用时, 表单上方显示「账号已被禁用」"
+      ],
+      "props": {},
+      "dependencies": ["T012", "T013"],
+      "reuseComponents": ["antd Card", "LoginForm", "useAuth"],
+      "acceptanceCriteria": [
+        "登录成功 → 跳 query.redirect 或 /",
+        "40101 错误 → 错误文案展示 + 密码框清空",
+        "40102 错误 → 显示「账号已被禁用」",
+        "已登录访问 /login → 立即重定向到 /",
+        "页面在 Chrome / Safari 渲染一致"
+      ],
+      "status": "pending"
+    },
+    {
+      "taskId": "T016",
+      "type": "page",
+      "name": "注册页",
+      "filePath": "src/pages/register/index.tsx",
+      "description": "组合 RegisterForm + useAuth: 接 onSubmit → useAuth.register, 捕获 40201 错误码 → 通过 usernameError 传给 RegisterForm。注册成功 → toast「注册成功, 请登录」 + 跳 /login。",
+      "prdRef": "docs/prds/login.md#功能点-2-用户注册",
+      "businessRules": [
+        "账号已被占用时, 接口返回 40201, 表单在账号字段显示「该账号已被注册」",
+        "注册成功后, 跳转到登录页并 toast「注册成功, 请登录」",
+        "注册后默认角色为普通用户 (role=user), 管理员由后台另行分配"
+      ],
+      "props": {},
+      "dependencies": ["T012", "T014"],
+      "reuseComponents": ["antd Card", "antd message", "RegisterForm", "useAuth"],
+      "acceptanceCriteria": [
+        "注册成功 → toast + 跳 /login",
+        "40201 → 账号字段显示已被注册错误",
+        "loading 时按钮不可重复点击"
+      ],
+      "status": "pending"
+    },
+    {
+      "taskId": "T017",
+      "type": "page",
+      "name": "403 无权限页",
+      "filePath": "src/pages/403.tsx",
+      "description": "无权限提示页, 使用 antd Result status='403', 提供「返回首页」按钮。",
+      "prdRef": "docs/prds/login.md#功能点-4-路由守卫与角色权限",
+      "businessRules": [
+        "普通用户 (role=user) 访问管理员专属页面时, 跳转到 /403"
+      ],
+      "props": {},
+      "dependencies": ["T007"],
+      "reuseComponents": ["antd Result", "antd Button"],
+      "acceptanceCriteria": [
+        "Result status='403'",
+        "标题/副标题/按钮文案均国际化",
+        "点击按钮回到 /"
+      ],
+      "status": "pending"
+    },
+    {
+      "taskId": "T018",
+      "type": "config",
+      "name": "路由配置",
+      "filePath": "config/routes.ts (新建) 或 config/config.ts 内联",
+      "description": "新增路由: { path: '/login', component: 'login' }, { path: '/register', component: 'register' }, { path: '/403', component: '403' } — 不带 wrappers; 其他业务路由统一加 wrappers: ['@/wrappers/auth']。在 config/config.ts 中引入 routes。",
+      "prdRef": "docs/prds/login.md#功能点-4-路由守卫与角色权限",
+      "businessRules": [
+        "除 /login / /register / /forgot-password 外, 所有页面均需登录态"
+      ],
+      "props": {},
+      "dependencies": ["T011", "T015", "T016", "T017"],
+      "reuseComponents": ["UmiJS routes config"],
+      "acceptanceCriteria": [
+        "/login /register /403 可匿名访问",
+        "/list 等业务路由未登录跳 /login?redirect=/list",
+        "已登录访问业务路由正常渲染",
+        "pnpm dev 启动后路由全部可达"
+      ],
+      "status": "pending"
+    }
+  ],
+  "routeConfig": {
+    "path": "/login, /register, /403",
+    "layout": "登录/注册/403 不使用 layout (whiteList); 业务路由继续使用 @umijs/plugin-layout 默认布局, 通过 wrappers 校验登录态"
+  },
+  "dataFlow": "用户在 LoginForm 输入 → 页面调 useAuth.login → authApi.login → 写 access/refresh token → fetchUserInfo (调 getCurrentUser) → 更新 @@initialState.currentUser → access.ts 派生 isLogin/canAdmin → 跳 redirect 或 /; 后续业务请求由 app.ts 拦截器自动注入 Authorization, 40103 时静默 refreshToken 重发, 40104 时 clearTokens + 跳 /login; 路由 wrapper 持续读 currentUser 决定放行或重定向。"
+}

@@ -55,8 +55,8 @@
 
 ### 数据契约 (引用 OpenAPI)
 
-> **字段细节以 OpenAPI 为准** (见 `api-spec/openapi.json`), 本章节只写**业务相关信息**: 调用哪些接口、错误码如何映射到业务行为、mock 数据约定。
-> 字段类型在 OpenAPI 一处定义, 前端通过 `pnpm gen:api` 自动生成 `src/types/api.ts`, 不在 PRD 重复维护。
+> **字段细节以 OpenAPI 为准** (见 `workspace/api-spec/openapi.json`), 本章节只写**业务相关信息**: 调用哪些接口、错误码如何映射到业务行为、mock 数据约定。
+> 字段类型在 OpenAPI 一处定义, 前端通过 `pnpm gen:api` 自动生成 `workspace/src/types/api.ts`, 不在 PRD 重复维护。
 
 #### 调用的接口
 
@@ -67,10 +67,10 @@
 | 导出 Excel | `exportUsers` | POST | `/api/users/export` | 🆕 待后端实现 (见下方接口提议) |
 
 > **状态字段**:
-> - ✅ 已存在: `api-spec/openapi.json` 里已定义, 直接用
-> - 🆕 待后端实现: 前端基于 PRD 写了 stub 提议, 评审后进 `openapi.local.json` 先开发, 后端实现后移除
+> - ✅ 已存在: `workspace/api-spec/openapi.json` 里已定义, 直接用
+> - 🆕 待后端实现: 前端基于 PRD 写了 stub 提议, 评审后进 `workspace/api-spec/openapi.local.json` 先开发, 后端实现后移除
 
-> 字段定义、参数约束、响应结构 → 看 `api-spec/openapi.json` (或 `openapi.local.json`) 中的对应 operationId。
+> 字段定义、参数约束、响应结构 → 看 `workspace/api-spec/openapi.json` (或 `workspace/api-spec/openapi.local.json`) 中的对应 operationId。
 
 #### 接口提议 (仅当有 🆕 接口时填写)
 
@@ -117,12 +117,12 @@ paths:
 
 #### Mock 数据约定
 
-- 后端未就绪期间, 在 `mock/` 写假数据, **必须 import 生成的类型** 保证结构对齐:
+- 后端未就绪期间, 在 `workspace/mock/` 写假数据, **必须 import 生成的类型** 保证结构对齐:
   ```typescript
   import type { paths } from '@/types/api';
   type SearchResp = paths['/api/users/search']['get']['responses']['200']['content']['application/json'];
   ```
-- 联调时通过 `config/proxy.ts` 切换到真实后端
+- 联调时通过 `workspace/config/proxy.ts` 切换到真实后端
 - 任何字段变更不要手改 mock, 先推后端更新 OpenAPI, 拉取新 json 后让 TS 编译告诉你哪里要改
 
 ### 交互流程

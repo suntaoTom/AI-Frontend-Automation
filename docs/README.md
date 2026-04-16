@@ -38,7 +38,7 @@ tasks-[模块名英文]-[日期].json
       "taskId": "T001", // 任务唯一标识
       "type": "api", // 类型: api | store | component | hook | page
       "name": "userApi", // 文件/模块名称
-      "filePath": "src/...", // 目标文件路径
+      "filePath": "workspace/src/...", // 目标文件路径
       "description": "...", // 具体实现要求
       "props": {}, // Props 接口定义 (组件才有)
       "dependencies": [], // 依赖的其他任务 taskId
@@ -111,7 +111,7 @@ docs/prds/user-list.md  (含 ## 搜索表单 锚点)
 @prd docs/prds/user-list.md#搜索表单
 
 # 4. 生成测试 (test 命令读 @prd 拉规则, 按规则生成 it())
-/test src/features/list/components/SearchForm.tsx
+/test workspace/src/features/list/components/SearchForm.tsx
 ```
 
 ### 锚点稳定性

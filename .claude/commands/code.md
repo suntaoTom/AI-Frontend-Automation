@@ -15,7 +15,7 @@
 
    `/plan-check` 内部已经包含了 `/prd-check` 的 PRD 完备性校验, 不需重复调用
 
-2. **openapi.json 类型已生成** — 检查 `src/types/api.ts` 存在; 不存在先跑 `pnpm gen:api`
+2. **openapi.json 类型已生成** — 检查 `workspace/src/types/api.ts` 存在; 不存在先跑 `pnpm gen:api`
 3. **无未处理 blocked 任务** — 如果 tasks[] 里有 `status: "blocked"` 的任务 (如「推动后端更新 OpenAPI: ...」), 停下列出, 要求用户决定是否跳过
 
 ## 执行原则
@@ -77,8 +77,8 @@ pending → in-progress → done
 
    建议下一步:
      1. 启动 dev 验证: pnpm dev
-     2. 生成测试: /test src/features/login/
-     3. 代码审查: /review src/features/login/
+     2. 生成测试: /test workspace/src/features/login/
+     3. 代码审查: /review workspace/src/features/login/
    ```
 3. 如果任务清单里有留存的 `blocked` 任务, 一并列出提醒
 

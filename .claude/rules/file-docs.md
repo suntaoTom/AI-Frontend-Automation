@@ -29,7 +29,7 @@
 
 ## 功能模块级 README.md
 
-每个 `src/features/[module]/` 目录必须有一个顶层 `README.md`，格式如下：
+每个 `workspace/src/features/[module]/` 目录必须有一个顶层 `README.md`，格式如下：
 
 ```markdown
 # 模块名称
@@ -117,7 +117,7 @@
 
 ## 全局索引
 
-在 `src/README.md` 中维护一个项目整体索引：
+在 `workspace/src/README.md` 中维护一个项目整体索引：
 
 ```markdown
 # 项目模块索引

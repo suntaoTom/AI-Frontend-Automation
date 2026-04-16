@@ -54,7 +54,7 @@
 
 ### 数据契约 (引用 OpenAPI)
 
-> 字段细节以 OpenAPI 为准。登录相关接口在 `api-spec/openapi.json` 中暂不存在, 以下为前端基于 PRD 的提议稿。
+> 字段细节以 OpenAPI 为准。登录相关接口在 `workspace/api-spec/openapi.json` 中暂不存在, 以下为前端基于 PRD 的提议稿。
 
 #### 调用的接口
 
@@ -78,7 +78,7 @@
 
 #### Mock 数据约定
 
-- 在 `mock/auth.ts` 中提供 `/api/auth/login` / `/api/auth/me` / `/api/auth/refresh` / `/api/auth/logout` 的假数据
+- 在 `workspace/mock/auth.ts` 中提供 `/api/auth/login` / `/api/auth/me` / `/api/auth/refresh` / `/api/auth/logout` 的假数据
 - 内置两个测试账号: `admin/admin123` (role=admin), `user/user123` (role=user)
 - Mock 返回结构必须 import `paths` 类型自 `@/types/api`, 保证与 OpenAPI 对齐
 
@@ -172,7 +172,7 @@
 5. 普通用户 (role=user) 访问管理员专属页面时, 跳转到 `/403`
 6. 本 PRD 仅定义权限框架 (登录态校验 + 角色校验 + 跳转逻辑); 具体哪些页面属于「管理员专属」由各功能 PRD 在自己的权限章节声明, 本 PRD 不做列举
 7. 用户信息通过 `@umijs/plugin-initial-state` 的 `getInitialState` 初始化, 在全局通过 `useModel('@@initialState')` 访问
-8. 角色权限通过 `@umijs/plugin-access` 的 `src/access.ts` 定义, 页面通过 `wrappers` 或 `Access` 组件校验
+8. 角色权限通过 `@umijs/plugin-access` 的 `workspace/src/access.ts` 定义, 页面通过 `wrappers` 或 `Access` 组件校验
 
 ### 数据契约
 
@@ -203,7 +203,7 @@
 
 ## 接口提议 (OpenAPI stub)
 
-> 以下为前端基于本 PRD 推断的 OpenAPI 草稿, 评审通过后由后端合并进 `api-spec/openapi.json` (或临时进 `openapi.local.json`)。字段类型待后端最终确认。
+> 以下为前端基于本 PRD 推断的 OpenAPI 草稿, 评审通过后由后端合并进 `workspace/api-spec/openapi.json` (或临时进 `workspace/api-spec/openapi.local.json`)。字段类型待后端最终确认。
 
 ```yaml
 paths:

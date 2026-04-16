@@ -5,6 +5,19 @@
 
 ---
 
+## 项目结构
+
+本项目分两层:
+
+| 层级 | 目录 | 职责 |
+|------|------|------|
+| **根目录** | `.claude/` / `docs/` / `CLAUDE.md` | AI 自动化框架 (命令/规则/PRD/任务) |
+| **workspace/** | `workspace/src/` / `workspace/config/` / ... | 实际前端项目 (UmiJS 工程) |
+
+根目录的 `pnpm dev` / `pnpm gen:api` 等命令会自动代理到 `workspace/` 执行, 用户无需手动 cd。
+
+---
+
 ## P0 禁止硬编码（最高优先级）
 
 一切可变值通过配置/常量/Design Token/国际化引入，严禁写死。配置本身不得重复，按层级复用。
@@ -47,7 +60,7 @@ UmiJS 4 + React 18 + TypeScript 5 + Ant Design 5 (@umijs/max)
 1. 所在目录的 `README.md`（文件清单表格）
 2. 文件顶部 JSDoc 注释（@description / @module / @dependencies / **@prd / @task / @rules**）
 3. 功能模块的模块级 `README.md`（业务流程 + 对外暴露）
-4. `src/README.md` 全局索引
+4. `workspace/src/README.md` 全局索引
 
 > **业务锚点 (@prd / @task / @rules) 是「需求 → 代码 → 测试」可追溯链的关键**, 让 `/test` 能根据业务规则而非源码行为生成测试, 避免 AI 自己猜预期。详见 `.claude/rules/file-docs.md`。
 
@@ -59,13 +72,13 @@ UmiJS 4 + React 18 + TypeScript 5 + Ant Design 5 (@umijs/max)
 
 - 不要使用 any 类型，必须明确类型定义
 - 不要使用 inline style，用 CSS Modules 或 Ant Design 组件样式
-- 图片资源放在 public/images/
+- 图片资源放在 workspace/public/images/
 - 环境变量以 UMI*APP* 开头
 - 所有异步操作必须有 loading 和 error 状态处理
 - 表单必须有验证和错误提示（antd Form 内置验证）
 - 列表页必须处理空状态（antd Empty）
-- 页面组件放 pages/，业务逻辑放 features/，不要混在一起
-- mock 数据放 mock/ 目录，使用 Umi 内置 mock 功能
+- 页面组件放 workspace/src/pages/，业务逻辑放 workspace/src/features/，不要混在一起
+- mock 数据放 workspace/mock/ 目录，使用 Umi 内置 mock 功能
 
 ---
 
@@ -76,14 +89,14 @@ UmiJS 4 + React 18 + TypeScript 5 + Ant Design 5 (@umijs/max)
 - docs/WORKFLOW.md — **新人/用户必读**, 从一句话需求到上线的五步法操作手册
 - docs/tasks/ — 存放 /plan 命令生成的 JSON 任务清单, 每个文件对应一个功能模块
 - docs/prds/ — 存放产品需求文档 (.md 格式), 模板见 docs/prds/_template.md
-- api-spec/ — OpenAPI 契约文件 (后端提供), 通过 `pnpm gen:api` 生成 src/types/api.ts
-- 详细说明见 docs/README.md 和 api-spec/README.md
+- workspace/api-spec/ — OpenAPI 契约文件 (后端提供), 通过 `pnpm gen:api` 生成 workspace/src/types/api.ts
+- 详细说明见 docs/README.md 和 workspace/api-spec/README.md
 
 ### API 类型铁律
 
 - API 类型**必须**从 `@/types/api` 导入, **禁止**手写 request/response 类型
-- `src/types/api.ts` 是 `pnpm gen:api` 生成的产物, 不要手改
-- OpenAPI 字段不对要推后端改 `api-spec/openapi.json`, 不要前端绕过
+- `workspace/src/types/api.ts` 是 `pnpm gen:api` 生成的产物, 不要手改
+- OpenAPI 字段不对要推后端改 `workspace/api-spec/openapi.json`, 不要前端绕过
 
 ### 任务清单使用方式
 

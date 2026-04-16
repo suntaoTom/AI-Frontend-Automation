@@ -43,14 +43,14 @@
 
    | PRD 状态 | 校验逻辑 | 不通过时的动作 |
    |---------|---------|---------------|
-   | ✅ 已存在 | 必须出现在 `api-spec/openapi.json` | 停下, 提醒拉取最新 openapi.json 或找后端确认 |
-   | 🆕 待后端实现 | 必须在 PRD「接口提议」章节有 stub, **或**已在 `api-spec/openapi.local.json` | 停下, 提醒补 stub / 评审 / 进 local.json |
+   | ✅ 已存在 | 必须出现在 `workspace/api-spec/openapi.json` | 停下, 提醒拉取最新 openapi.json 或找后端确认 |
+   | 🆕 待后端实现 | 必须在 PRD「接口提议」章节有 stub, **或**已在 `workspace/api-spec/openapi.local.json` | 停下, 提醒补 stub / 评审 / 进 local.json |
    | 无状态标注 | PRD 不规范 | 停下, 要求补齐状态列 |
 
    - 如果 PRD 完全缺少数据契约 → **停下提醒用户先走 `/prd` 补上**, 不要凭空编接口
    - 🆕 接口 stub 评审通过后, 有两条路径:
      - **推荐**: 合并进主 `openapi.json` (由后端或前端推 PR)
-     - **兜底**: 进 `api-spec/openapi.local.json`, 供前端本地开发, 后端实现后移除
+     - **兜底**: 进 `workspace/api-spec/openapi.local.json`, 供前端本地开发, 后端实现后移除
 3. **识别复用**: 检查 CLAUDE.md 中的已有组件库, 标注哪些可以复用
 4. **拆解任务**: 将需求拆解为具体的开发任务, **每个任务必须关联到一个 PRD 锚点**
 
@@ -59,11 +59,11 @@
 每个功能点必须按以下顺序产出任务 (依赖链清晰, 便于并行/分批):
 
 ```
-gen:api    (跑一次, 确保类型最新)  ← 命令: pnpm gen:api, 产物: src/types/api.ts
+gen:api    (跑一次, 确保类型最新)  ← 命令: pnpm gen:api, 产物: workspace/src/types/api.ts
    ↓
-api        (请求函数)              ← 类型从 src/types/api.ts import, 不要手写
+api        (请求函数)              ← 类型从 workspace/src/types/api.ts import, 不要手写
    ↓
-mock       (假数据)                ← 类型从 src/types/api.ts import, 后端没好时用
+mock       (假数据)                ← 类型从 workspace/src/types/api.ts import, 后端没好时用
    ↓
 store/hook (状态管理)              ← 来源: PRD 业务规则
    ↓
@@ -95,7 +95,7 @@ page       (页面装配)              ← 来源: PRD 交互流程
       "taskId": "T001",
       "type": "precondition | gen-api | api | mock | constants | utils | locale | config | model | store | hook | wrapper | component | page",
       "name": "文件名称",
-      "filePath": "src/features/xxx/xxx.ts",
+      "filePath": "workspace/src/features/xxx/xxx.ts",
       "description": "具体实现要求",
       "prdRef": "docs/prds/user-list.md#搜索表单",
       "businessRules": [

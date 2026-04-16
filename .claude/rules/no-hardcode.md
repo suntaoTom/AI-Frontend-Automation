@@ -29,7 +29,7 @@ message.success(intl.formatMessage({ id: 'common.success' }));
 <Tag color="#f50">错误</Tag>
 
 // ✅ 正确 — 通过 Ant Design Design Token
-// config/theme.ts 中统一定义 token
+// workspace/config/theme.ts 中统一定义 token
 export const theme = {
   token: {
     colorPrimary: '#1890ff',
@@ -50,13 +50,13 @@ fetch('/api/v1/users');
 const BASE_URL = 'https://api.example.com';
 
 // ✅ 正确 — 通过配置文件 + 环境变量
-// config/api.ts
+// workspace/config/api.ts
 export const API_ENDPOINTS = {
   USER_LIST: '/users',
   USER_DETAIL: (id: string) => `/users/${id}`,
 } as const;
 
-// 环境变量控制 baseURL，在 config/config.ts 中通过 proxy 或 define 注入
+// 环境变量控制 baseURL，在 workspace/config/config.ts 中通过 proxy 或 define 注入
 ```
 
 ### 4. 业务常量与枚举
@@ -80,7 +80,7 @@ export const STATUS_OPTIONS = [
 <div style={{ padding: '16px 24px', maxWidth: '1200px' }} />
 
 // ✅ 正确 — 通过 Design Token 或 CSS 变量
-// config/theme.ts 中定义
+// workspace/config/theme.ts 中定义
 token: { padding: 16, paddingLG: 24, screenXL: 1200 }
 ```
 
@@ -100,7 +100,7 @@ const PAGE_SIZE = 10;
 配置本身也必须遵循 DRY 原则，避免大量重复：
 
 ```
-config/
+workspace/config/
 ├── theme.ts             # 唯一的主题 token 定义源 (颜色/字体/间距)
 ├── constants/
 │   ├── common.ts        # 全局共享常量 (分页大小/超时时间/正则等)
@@ -108,7 +108,7 @@ config/
 ├── api.ts               # API 端点集中管理
 └── config.ts            # Umi 主配置
 
-src/features/[module]/
+workspace/src/features/[module]/
 ├── constants.ts         # 模块专属常量 (仅模块内使用的值)
 └── ...
 ```
@@ -117,14 +117,14 @@ src/features/[module]/
 
 | 层级 | 定义位置 | 示例 |
 |------|---------|------|
-| 主题 token | config/theme.ts | 颜色、字体、圆角、间距 |
-| 全局常量 | config/constants/ | 分页大小、日期格式、正则 |
-| 全局国际化 | src/locales/common.ts | 通用文案 (提交/取消/确认) |
-| 模块常量 | features/[module]/constants.ts | 业务状态码、下拉选项 |
-| 模块国际化 | src/locales/[module].ts | 模块专属文案 |
+| 主题 token | workspace/config/theme.ts | 颜色、字体、圆角、间距 |
+| 全局常量 | workspace/config/constants/ | 分页大小、日期格式、正则 |
+| 全局国际化 | workspace/src/locales/common.ts | 通用文案 (提交/取消/确认) |
+| 模块常量 | workspace/src/features/[module]/constants.ts | 业务状态码、下拉选项 |
+| 模块国际化 | workspace/src/locales/[module].ts | 模块专属文案 |
 
 ### 禁止
 
-- 多个模块各自定义相同的常量值 → 提取到 config/constants/
-- 多个国际化文件重复相同文案 → 提取到 locales/common.ts
-- 多处重复定义相同的 token/颜色值 → 统一在 config/theme.ts
+- 多个模块各自定义相同的常量值 → 提取到 workspace/config/constants/
+- 多个国际化文件重复相同文案 → 提取到 workspace/src/locales/common.ts
+- 多处重复定义相同的 token/颜色值 → 统一在 workspace/config/theme.ts

@@ -1,31 +1,13 @@
 {
   "private": true,
   "name": "ai-frontend-automation",
-  "description": "AI 前端自动化项目 - 通用列表页模块",
+  "description": "AI 前端自动化框架 — 根目录负责 agent 命令/规则/文档, workspace/ 负责实际项目代码",
   "scripts": {
-    "dev": "max dev",
-    "build": "max build",
-    "prepare": "max setup",
-    "lint": "max lint",
-    "test": "vitest",
-    "gen:api": "node scripts/gen-api.mjs"
-  },
-  "dependencies": {
-    "@umijs/max": "^4.4.0",
-    "antd": "^5.22.0",
-    "zustand": "^5.0.0"
-  },
-  "devDependencies": {
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
-    "@types/react": "^18.3.0",
-    "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.0.0",
-    "jsdom": "^29.0.2",
-    "openapi-typescript": "^7.4.0",
-    "swagger2openapi": "^7.0.8",
-    "typescript": "^5.6.0",
-    "vitest": "^2.1.0"
+    "dev": "pnpm --prefix workspace dev",
+    "build": "pnpm --prefix workspace build",
+    "lint": "pnpm --prefix workspace lint",
+    "test": "pnpm --prefix workspace test",
+    "gen:api": "pnpm --prefix workspace gen:api",
+    "install:workspace": "cd workspace && pnpm install"
   }
 }

@@ -54,7 +54,7 @@
 
 对每个 `🆕 待后端实现` 的 operationId, 检查它是否:
 - 出现在 PRD 的「接口提议」章节 (代码块里有对应 operationId)
-- **或**已在 `api-spec/openapi.local.json`
+- **或**已在 `workspace/api-spec/openapi.local.json`
 
 两处都没有 → 不通过。
 

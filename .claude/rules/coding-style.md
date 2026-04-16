@@ -72,14 +72,14 @@
 ## API 规范
 
 - 请求统一使用 @umijs/plugin-request (umi-request), 不要引入 axios
-- 全局请求/响应拦截在 src/app.ts 的 request 配置中定义
-- 请求函数放在 features/[module]/api/ 或 src/services/ 目录
+- 全局请求/响应拦截在 workspace/src/app.ts 的 request 配置中定义
+- 请求函数放在 workspace/src/features/[module]/api/ 或 workspace/src/services/ 目录
 - 类型定义与后端 API 文档保持一致
 - 错误码统一处理, 通过 errorHandler 配置
 
 ## 状态管理规范
 
-- 全局共享状态优先用 @umijs/plugin-model (useModel), 文件放 src/models/
+- 全局共享状态优先用 @umijs/plugin-model (useModel), 文件放 workspace/src/models/
 - 初始化数据 (用户信息/权限等) 用 getInitialState + useModel('@@initialState')
 - 复杂独立状态用 Zustand, Store 文件以 use 开头 (useAuthStore.ts)
 - 组件局部状态用 useState/useReducer

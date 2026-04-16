@@ -49,8 +49,8 @@
 
 对 `type: "api"` 或 `type: "mock"` 的任务:
 - 任务描述或 filePath 暗示的 operationId, 必须出现在以下三处之一:
-  1. `api-spec/openapi.json`
-  2. `api-spec/openapi.local.json`
+  1. `workspace/api-spec/openapi.json`
+  2. `workspace/api-spec/openapi.local.json`
   3. PRD 的「接口提议」章节 stub (`operationId: xxx`)
 - 如三处均缺, 进一步检查 tasks[] 是否存在一个 `type: "precondition"` 任务承诺把 stub 落地, 若存在则降级为**警告** (不阻塞), 提示执行顺序上必须先做 precondition
 - 对 `type: "api"` 任务, 如 `description` 里写了 operationId, 直接查
@@ -63,7 +63,7 @@
 按 `task.type` 校验排序:
 - 如果整个 tasks[] 里有任何 `api` / `mock` 任务, 必须存在一个 `type: "gen-api"` 的任务且排在所有 `api`/`mock` 之前
 - `page` 任务必须依赖至少一个 `component` 任务 (通过 dependencies)
-  - **豁免**: 纯占位/提示页 (如 `403`/`404`/`500` 等系统页) 可以只依赖 `locale` 任务, 因为它们只由 antd 内置组件 (如 `Result`) 直接装配, 无业务组件可抽
+  - **豁免**: 纯占位/提示页 (如 `403`/`404`/`500` 等系统页) 可以只依赖 `locale` 任务, 因为它们只由 UI 框架内置组件直接装配, 无业务组件可抽
   - 判定依据: 任务名或 filePath 含 `403` / `404` / `500`, 或 description 明确说「无业务逻辑」「纯展示」
 - `api` 任务不能依赖 `component` / `page` (方向反了)
 - `store` / `hook` 不能依赖 `page`

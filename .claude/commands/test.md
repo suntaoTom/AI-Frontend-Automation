@@ -7,16 +7,16 @@
 
 ## 测试文件存放规则 (强制)
 
-所有测试文件**统一存放在项目根目录的 `tests/` 下**, 镜像 `src/` 目录结构与源文件一一对应。
+所有测试文件**统一存放在 `workspace/tests/` 下**, 镜像 `workspace/src/` 目录结构与源文件一一对应。
 **禁止**把 `*.test.ts(x)` 放在源文件同目录或 `__tests__/` 子目录中。
 
 映射关系示例:
 
 | 源文件 | 测试文件 |
 |--------|----------|
-| `src/features/list/api/listApi.ts` | `tests/features/list/api/listApi.test.ts` |
-| `src/features/list/components/SearchForm.tsx` | `tests/features/list/components/SearchForm.test.tsx` |
-| `src/pages/list/index.tsx` | `tests/pages/list/index.test.tsx` |
+| `workspace/src/features/list/api/listApi.ts` | `workspace/tests/features/list/api/listApi.test.ts` |
+| `workspace/src/features/list/components/SearchForm.tsx` | `workspace/tests/features/list/components/SearchForm.test.tsx` |
+| `workspace/src/pages/list/index.tsx` | `workspace/tests/pages/list/index.test.tsx` |
 
 测试文件内引用业务代码**一律使用 `@/` 别名** (不要写 `../../../src/...`):
 
@@ -80,11 +80,11 @@ vi.mock('@/features/list/api/listApi', () => ({ ... }));
    ```
    扫描结果:
      ✅ 已覆盖且最新 (跳过):
-        - src/components/UserCard.tsx
+        - workspace/src/components/UserCard.tsx
      🔄 源码有更新 (建议重新生成):
-        - src/components/UserProfile.tsx (源 2026-04-10 > 测试 2026-03-20)
+        - workspace/src/components/UserProfile.tsx (源 2026-04-10 > 测试 2026-03-20)
      ❌ 无测试 (将生成):
-        - src/components/Dashboard.tsx
+        - workspace/src/components/Dashboard.tsx
    ```
 
 ### 第二步: 根据参数决定处理范围

@@ -1,0 +1,175 @@
+name: Deploy iOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: '部署环境'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: '版本号 (如 v1.2.0)'
+        required: true
+        type: string
+
+concurrency:
+  group: deploy-ios-${{ github.event.inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install CocoaPods
+        run: |
+          cd ios
+          pod install --repo-update
+        continue-on-error: true
+
+      - name: Import signing certificate
+        uses: apple-actions/import-codesign-certs@v2
+        with:
+          p12-file-base64: ${{ secrets.IOS_CERTIFICATE_P12 }}
+          p12-password: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+
+      - name: Download provisioning profile
+        uses: apple-actions/download-provisioning-profiles@v2
+        with:
+          bundle-id: ${{ vars.IOS_BUNDLE_ID }}
+          issuer-id: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+          api-key-id: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          api-private-key: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+
+      - name: Build archive
+        run: |
+          cd ios
+          xcodebuild archive \
+            -workspace *.xcworkspace \
+            -scheme "${{ vars.IOS_SCHEME }}" \
+            -configuration Release \
+            -archivePath build/app.xcarchive \
+            -allowProvisioningUpdates \
+            MARKETING_VERSION=${{ github.event.inputs.version }}
+
+      - name: Export IPA
+        run: |
+          cd ios
+          if [ "${{ github.event.inputs.environment }}" == "staging" ]; then
+            METHOD="app-store"  # TestFlight uses app-store method
+          else
+            METHOD="app-store"
+          fi
+          xcodebuild -exportArchive \
+            -archivePath build/app.xcarchive \
+            -exportPath build/export \
+            -exportOptionsPlist ExportOptions.plist
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa-${{ github.event.inputs.version }}
+          path: ios/build/export/*.ipa
+          retention-days: 30
+
+  deploy-staging:
+    if: github.event.inputs.environment == 'staging'
+    needs: build
+    runs-on: macos-latest
+    environment: staging
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-ipa-${{ github.event.inputs.version }}
+          path: ipa/
+
+      - name: Upload to TestFlight
+        run: |
+          xcrun altool --upload-app \
+            --type ios \
+            --file ipa/*.ipa \
+            --apiKey "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
+            --apiIssuer "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}"
+          echo "✅ Uploaded to TestFlight"
+
+  deploy-production:
+    if: github.event.inputs.environment == 'production'
+    needs: build
+    runs-on: macos-latest
+    environment: production
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-ipa-${{ github.event.inputs.version }}
+          path: ipa/
+
+      - name: Submit to App Store
+        run: |
+          xcrun altool --upload-app \
+            --type ios \
+            --file ipa/*.ipa \
+            --apiKey "${{ secrets.APP_STORE_CONNECT_KEY_ID }}" \
+            --apiIssuer "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}"
+          echo "✅ Submitted to App Store Connect for review"
+
+  notify:
+    needs: [build, deploy-staging, deploy-production]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send DingTalk notification
+        if: vars.DINGTALK_WEBHOOK != ''
+        run: |
+          DEPLOY_JOB="deploy-${{ github.event.inputs.environment }}"
+          STATUS="✅ 成功"
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            STATUS="❌ 构建失败"
+          fi
+          TARGET="TestFlight"
+          if [ "${{ github.event.inputs.environment }}" == "production" ]; then
+            TARGET="App Store"
+          fi
+          curl -s -X POST "${{ vars.DINGTALK_WEBHOOK }}" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"msgtype\": \"markdown\",
+              \"markdown\": {
+                \"title\": \"iOS 部署通知\",
+                \"text\": \"## 🍎 iOS 部署通知\n\n- **目标**: ${TARGET}\n- **版本**: ${{ github.event.inputs.version }}\n- **状态**: ${STATUS}\n- **触发人**: ${{ github.actor }}\"
+              }
+            }"
+
+      - name: Send Feishu notification
+        if: vars.FEISHU_WEBHOOK != ''
+        run: |
+          TARGET="TestFlight"
+          if [ "${{ github.event.inputs.environment }}" == "production" ]; then
+            TARGET="App Store"
+          fi
+          STATUS="✅ 成功"
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            STATUS="❌ 构建失败"
+          fi
+          curl -s -X POST "${{ vars.FEISHU_WEBHOOK }}" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"msg_type\": \"interactive\",
+              \"card\": {
+                \"header\": { \"title\": { \"tag\": \"plain_text\", \"content\": \"🍎 iOS 部署通知\" } },
+                \"elements\": [{
+                  \"tag\": \"div\",
+                  \"text\": { \"tag\": \"lark_md\", \"content\": \"**目标**: ${TARGET}\n**版本**: ${{ github.event.inputs.version }}\n**状态**: ${STATUS}\n**触发人**: ${{ github.actor }}\" }
+                }]
+              }
+            }"

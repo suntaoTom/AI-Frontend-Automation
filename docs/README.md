@@ -7,7 +7,7 @@
 ```
 docs/
 ├── README.md              ← 你正在看的这个文件
-├── WORKFLOW.md            ← 五步法工作流手册
+├── WORKFLOW.md            ← 八步法工作流手册
 ├── tasks/                 ← /plan 生成的任务清单
 │   ├── tasks-user-module-2026-03-30.json
 │   └── ...

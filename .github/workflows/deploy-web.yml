@@ -1,0 +1,337 @@
+name: Deploy Web
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: '部署环境'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: '版本号 (如 v1.2.0)'
+        required: true
+        type: string
+      deploy_method:
+        description: '部署方式'
+        required: true
+        type: choice
+        options:
+          - server
+          - cdn
+        default: 'server'
+      canary_percent:
+        description: '灰度百分比 (0 = 全量, 仅 production)'
+        required: false
+        default: '0'
+        type: string
+
+concurrency:
+  group: deploy-web-${{ github.event.inputs.environment }}
+  cancel-in-progress: false
+
+env:
+  DIST_DIR: workspace/dist
+
+jobs:
+  # ─── 第一步: 构建 ───
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          cache-dependency-path: workspace/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: workspace
+
+      - name: Build
+        run: pnpm build
+        working-directory: workspace
+        env:
+          UMI_ENV: ${{ github.event.inputs.environment }}
+
+      - name: Verify build output
+        run: |
+          if [ ! -f "${{ env.DIST_DIR }}/index.html" ]; then
+            echo "❌ Build failed: index.html not found in ${{ env.DIST_DIR }}"
+            exit 1
+          fi
+          FILE_COUNT=$(find ${{ env.DIST_DIR }} -type f | wc -l)
+          TOTAL_SIZE=$(du -sh ${{ env.DIST_DIR }} | cut -f1)
+          echo "✅ Build output: ${FILE_COUNT} files, ${TOTAL_SIZE}"
+          echo "build_size=${TOTAL_SIZE}" >> $GITHUB_OUTPUT
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist-${{ github.event.inputs.version }}
+          path: ${{ env.DIST_DIR }}/
+          retention-days: 30
+
+  # ─── 第二步: 部署到服务器 (SSH + rsync) ───
+  deploy-server:
+    if: github.event.inputs.deploy_method == 'server'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    outputs:
+      access_url: ${{ steps.deploy.outputs.access_url }}
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist-${{ github.event.inputs.version }}
+          path: dist/
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # 自动信任目标服务器指纹, 避免交互式确认
+          ssh-keyscan -p ${{ vars.DEPLOY_SSH_PORT || 22 }} ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy via rsync
+        id: deploy
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          HOST="${{ vars.DEPLOY_HOST }}"
+          USER="${{ vars.DEPLOY_USER }}"
+          PORT="${{ vars.DEPLOY_SSH_PORT || 22 }}"
+          DEPLOY_PATH="${{ vars.DEPLOY_PATH }}"
+          ACCESS_URL="${{ vars.ACCESS_URL }}"
+
+          echo "🚀 Deploying ${{ github.event.inputs.version }} to ${USER}@${HOST}:${DEPLOY_PATH}"
+
+          # 1. 备份当前版本 (保留最近 5 个)
+          ssh -i ~/.ssh/deploy_key -p ${PORT} ${USER}@${HOST} << 'BACKUP_EOF'
+            DEPLOY_PATH="${{ vars.DEPLOY_PATH }}"
+            BACKUP_DIR="${DEPLOY_PATH}/../_backups"
+            mkdir -p ${BACKUP_DIR}
+            if [ -d "${DEPLOY_PATH}" ] && [ "$(ls -A ${DEPLOY_PATH} 2>/dev/null)" ]; then
+              TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+              tar -czf ${BACKUP_DIR}/${TIMESTAMP}.tar.gz -C ${DEPLOY_PATH} .
+              echo "📦 Backup created: ${BACKUP_DIR}/${TIMESTAMP}.tar.gz"
+              # 只保留最近 5 个备份
+              ls -t ${BACKUP_DIR}/*.tar.gz 2>/dev/null | tail -n +6 | xargs rm -f 2>/dev/null
+            fi
+          BACKUP_EOF
+
+          # 2. rsync 上传产物 (增量同步, 删除远端多余文件)
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -p ${PORT}" \
+            dist/ ${USER}@${HOST}:${DEPLOY_PATH}/
+
+          # 3. 执行远程后置命令 (reload nginx 等)
+          ssh -i ~/.ssh/deploy_key -p ${PORT} ${USER}@${HOST} << 'POST_EOF'
+            # 检查 nginx 配置语法
+            if command -v nginx &> /dev/null; then
+              sudo nginx -t && sudo nginx -s reload
+              echo "✅ Nginx reloaded"
+            fi
+
+            # 如果用 PM2 管理 Node 服务 (SSR 场景)
+            if command -v pm2 &> /dev/null && pm2 list | grep -q "${{ vars.PM2_APP_NAME }}"; then
+              pm2 reload ${{ vars.PM2_APP_NAME }}
+              echo "✅ PM2 app reloaded"
+            fi
+          POST_EOF
+
+          echo "access_url=${ACCESS_URL}" >> $GITHUB_OUTPUT
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "✅ 部署完成!"
+          echo "🌐 访问地址: ${ACCESS_URL}"
+          echo "════════════════════════════════════════"
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # ─── 第二步 (备选): 部署到 CDN/OSS ───
+  deploy-cdn:
+    if: github.event.inputs.deploy_method == 'cdn'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    outputs:
+      access_url: ${{ steps.deploy.outputs.access_url }}
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist-${{ github.event.inputs.version }}
+          path: dist/
+
+      - name: Deploy to CDN/OSS
+        id: deploy
+        run: |
+          ACCESS_URL="${{ vars.ACCESS_URL }}"
+          BUCKET="${{ vars.CDN_BUCKET }}"
+          REGION="${{ vars.CDN_REGION }}"
+
+          # ── 阿里云 OSS ──
+          if [ -n "${{ secrets.ALIYUN_ACCESS_KEY_ID }}" ]; then
+            pip install ossutil64 2>/dev/null || true
+            ossutil cp -r -f dist/ oss://${BUCKET}/ \
+              --access-key-id ${{ secrets.ALIYUN_ACCESS_KEY_ID }} \
+              --access-key-secret ${{ secrets.ALIYUN_ACCESS_KEY_SECRET }} \
+              --endpoint oss-${REGION}.aliyuncs.com
+            echo "✅ Deployed to Aliyun OSS: ${BUCKET}"
+
+          # ── AWS S3 ──
+          elif [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+            aws s3 sync dist/ s3://${BUCKET}/ --delete \
+              --region ${REGION}
+            # 刷新 CloudFront 缓存 (如配置了)
+            if [ -n "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}" ]; then
+              aws cloudfront create-invalidation \
+                --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }} \
+                --paths "/*"
+            fi
+            echo "✅ Deployed to AWS S3: ${BUCKET}"
+
+          # ── 腾讯云 COS ──
+          elif [ -n "${{ secrets.TENCENT_SECRET_ID }}" ]; then
+            coscmd config -a ${{ secrets.TENCENT_SECRET_ID }} \
+              -s ${{ secrets.TENCENT_SECRET_KEY }} \
+              -b ${BUCKET} -r ${REGION}
+            coscmd upload -r dist/ /
+            echo "✅ Deployed to Tencent COS: ${BUCKET}"
+
+          else
+            echo "❌ No cloud provider credentials configured"
+            exit 1
+          fi
+
+          echo "access_url=${ACCESS_URL}" >> $GITHUB_OUTPUT
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "✅ 部署完成!"
+          echo "🌐 访问地址: ${ACCESS_URL}"
+          echo "════════════════════════════════════════"
+
+  # ─── 第三步: 验证 ───
+  verify:
+    needs: [deploy-server, deploy-cdn]
+    if: always() && (needs.deploy-server.result == 'success' || needs.deploy-cdn.result == 'success')
+    runs-on: ubuntu-latest
+    outputs:
+      access_url: ${{ steps.check.outputs.access_url }}
+    steps:
+      - name: Health check
+        id: check
+        run: |
+          # 取实际部署 job 输出的 URL
+          URL="${{ needs.deploy-server.outputs.access_url || needs.deploy-cdn.outputs.access_url }}"
+
+          echo "🔍 Checking ${URL} ..."
+
+          # 等待 10s 让 nginx/CDN 生效
+          sleep 10
+
+          # HTTP 状态码检查
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$URL" || echo "000")
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ Health check failed: HTTP $STATUS at $URL"
+            exit 1
+          fi
+
+          # 检查关键资源 (index.html 中应包含 JS/CSS 引用)
+          BODY=$(curl -s --max-time 30 "$URL")
+          if ! echo "$BODY" | grep -q '<script'; then
+            echo "⚠️ Warning: No <script> tag found in response"
+          fi
+
+          echo "access_url=${URL}" >> $GITHUB_OUTPUT
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "✅ 验证通过! HTTP ${STATUS}"
+          echo "🌐 访问地址: ${URL}"
+          echo "════════════════════════════════════════"
+
+  # ─── 第四步: 通知 (附带访问地址) ───
+  notify:
+    needs: [build, verify]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare notification content
+        id: content
+        run: |
+          STATUS="✅ 成功"
+          ACCESS_URL="${{ needs.verify.outputs.access_url }}"
+          if [ "${{ needs.verify.result }}" != "success" ]; then
+            STATUS="❌ 失败"
+            ACCESS_URL="部署失败, 请检查日志"
+          fi
+          echo "status=${STATUS}" >> $GITHUB_OUTPUT
+          echo "access_url=${ACCESS_URL}" >> $GITHUB_OUTPUT
+
+      - name: Send DingTalk notification
+        if: vars.DINGTALK_WEBHOOK != ''
+        run: |
+          curl -s -X POST "${{ vars.DINGTALK_WEBHOOK }}" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"msgtype\": \"markdown\",
+              \"markdown\": {
+                \"title\": \"Web 部署通知\",
+                \"text\": \"## 🚀 Web 部署通知\n\n- **环境**: ${{ github.event.inputs.environment }}\n- **版本**: ${{ github.event.inputs.version }}\n- **状态**: ${{ steps.content.outputs.status }}\n- **触发人**: ${{ github.actor }}\n- **分支**: ${{ github.ref_name }}\n\n**🌐 访问地址**: ${{ steps.content.outputs.access_url }}\"
+              }
+            }"
+
+      - name: Send Feishu notification
+        if: vars.FEISHU_WEBHOOK != ''
+        run: |
+          curl -s -X POST "${{ vars.FEISHU_WEBHOOK }}" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"msg_type\": \"interactive\",
+              \"card\": {
+                \"header\": { \"title\": { \"tag\": \"plain_text\", \"content\": \"🚀 Web 部署通知\" } },
+                \"elements\": [
+                  {
+                    \"tag\": \"div\",
+                    \"text\": { \"tag\": \"lark_md\", \"content\": \"**环境**: ${{ github.event.inputs.environment }}\n**版本**: ${{ github.event.inputs.version }}\n**状态**: ${{ steps.content.outputs.status }}\n**触发人**: ${{ github.actor }}\" }
+                  },
+                  {
+                    \"tag\": \"action\",
+                    \"actions\": [{
+                      \"tag\": \"button\",
+                      \"text\": { \"tag\": \"plain_text\", \"content\": \"🌐 打开访问地址\" },
+                      \"url\": \"${{ steps.content.outputs.access_url }}\",
+                      \"type\": \"primary\"
+                    }]
+                  }
+                ]
+              }
+            }"
+
+      - name: Output summary
+        run: |
+          echo ""
+          echo "══════════════════════════════════════════════════"
+          echo "📋 部署摘要"
+          echo "──────────────────────────────────────────────────"
+          echo "  平台:     Web"
+          echo "  环境:     ${{ github.event.inputs.environment }}"
+          echo "  版本:     ${{ github.event.inputs.version }}"
+          echo "  方式:     ${{ github.event.inputs.deploy_method }}"
+          echo "  状态:     ${{ steps.content.outputs.status }}"
+          echo "  触发人:   ${{ github.actor }}"
+          echo ""
+          echo "  🌐 访问地址: ${{ steps.content.outputs.access_url }}"
+          echo "══════════════════════════════════════════════════"

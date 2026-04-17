@@ -86,7 +86,7 @@ UmiJS 4 + React 18 + TypeScript 5 + Ant Design 5 (@umijs/max)
 
 ### docs/ 目录结构
 
-- docs/WORKFLOW.md — **新人/用户必读**, 从一句话需求到上线的五步法操作手册
+- docs/WORKFLOW.md — **新人/用户必读**, 从一句话需求到上线的八步法操作手册
 - docs/tasks/ — 存放 /plan 命令生成的 JSON 任务清单, 每个文件对应一个功能模块
 - docs/prds/ — 存放产品需求文档 (.md 格式), 模板见 docs/prds/_template.md
 - workspace/api-spec/ — OpenAPI 契约文件 (后端提供), 通过 `pnpm gen:api` 生成 workspace/src/types/api.ts

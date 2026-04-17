@@ -1,0 +1,293 @@
+name: Deploy Android
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: '部署环境'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: '版本号 (如 v1.2.0)'
+        required: true
+        type: string
+
+concurrency:
+  group: deploy-android-${{ github.event.inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      apk_size: ${{ steps.verify.outputs.apk_size }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Decode keystore
+        run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
+
+      - name: Build Release APK
+        run: |
+          cd android
+          ./gradlew assembleRelease \
+            -Pandroid.injected.signing.store.file=app/release.keystore \
+            -Pandroid.injected.signing.store.password="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.ANDROID_KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.ANDROID_KEY_PASSWORD }}" \
+            -PversionName=${{ github.event.inputs.version }}
+        env:
+          BUILD_ENV: ${{ github.event.inputs.environment }}
+
+      - name: Build AAB (production only)
+        if: github.event.inputs.environment == 'production'
+        run: |
+          cd android
+          ./gradlew bundleRelease \
+            -Pandroid.injected.signing.store.file=app/release.keystore \
+            -Pandroid.injected.signing.store.password="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
+            -Pandroid.injected.signing.key.alias="${{ secrets.ANDROID_KEY_ALIAS }}" \
+            -Pandroid.injected.signing.key.password="${{ secrets.ANDROID_KEY_PASSWORD }}" \
+            -PversionName=${{ github.event.inputs.version }}
+
+      - name: Verify build output
+        id: verify
+        run: |
+          APK_PATH=$(find android/app/build/outputs/apk/release -name "*.apk" | head -1)
+          if [ -z "$APK_PATH" ]; then
+            echo "❌ APK not found"
+            exit 1
+          fi
+          APK_SIZE=$(du -h "$APK_PATH" | cut -f1)
+          echo "✅ APK built: ${APK_PATH} (${APK_SIZE})"
+          echo "apk_size=${APK_SIZE}" >> $GITHUB_OUTPUT
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk-${{ github.event.inputs.version }}
+          path: android/app/build/outputs/apk/release/*.apk
+          retention-days: 30
+
+      - name: Upload AAB artifact
+        if: github.event.inputs.environment == 'production'
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-aab-${{ github.event.inputs.version }}
+          path: android/app/build/outputs/bundle/release/*.aab
+          retention-days: 30
+
+  # ─── staging: 上传到内部分发平台, 输出下载链接 ───
+  deploy-staging:
+    if: github.event.inputs.environment == 'staging'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: staging
+    outputs:
+      download_url: ${{ steps.distribute.outputs.download_url }}
+    steps:
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: android-apk-${{ github.event.inputs.version }}
+          path: apk/
+
+      - name: Upload to distribution platform
+        id: distribute
+        run: |
+          APK_PATH=$(find apk/ -name "*.apk" | head -1)
+
+          # ── 蒲公英 (pgyer) ──
+          if [ -n "${{ secrets.PGYER_API_KEY }}" ]; then
+            RESPONSE=$(curl -s -F "file=@${APK_PATH}" \
+              -F "_api_key=${{ secrets.PGYER_API_KEY }}" \
+              -F "buildUpdateDescription=${{ github.event.inputs.version }}" \
+              https://www.pgyer.com/apiv2/app/upload)
+
+            BUILD_KEY=$(echo $RESPONSE | jq -r '.data.buildKey // empty')
+            if [ -n "$BUILD_KEY" ]; then
+              DOWNLOAD_URL="https://www.pgyer.com/${BUILD_KEY}"
+              echo "✅ Uploaded to pgyer"
+            else
+              echo "❌ pgyer upload failed: $RESPONSE"
+              exit 1
+            fi
+
+          # ── fir.im ──
+          elif [ -n "${{ secrets.FIR_TOKEN }}" ]; then
+            RESPONSE=$(curl -s -F "file=@${APK_PATH}" \
+              -F "type=android" \
+              -F "bundle_id=${{ vars.ANDROID_PACKAGE_NAME }}" \
+              -F "api_token=${{ secrets.FIR_TOKEN }}" \
+              https://api.bq04.com/apps)
+
+            SHORT_URL=$(echo $RESPONSE | jq -r '.short // empty')
+            if [ -n "$SHORT_URL" ]; then
+              DOWNLOAD_URL="https://fir.im/${SHORT_URL}"
+              echo "✅ Uploaded to fir.im"
+            else
+              echo "❌ fir.im upload failed: $RESPONSE"
+              exit 1
+            fi
+
+          # ── 自建文件服务器 (SCP + Nginx 静态文件) ──
+          elif [ -n "${{ secrets.DEPLOY_SSH_KEY }}" ]; then
+            mkdir -p ~/.ssh
+            echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+            chmod 600 ~/.ssh/deploy_key
+            ssh-keyscan -p ${{ vars.DEPLOY_SSH_PORT || 22 }} ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+            REMOTE_DIR="${{ vars.APK_SERVE_PATH }}/${{ github.event.inputs.version }}"
+            HOST="${{ vars.DEPLOY_HOST }}"
+            USER="${{ vars.DEPLOY_USER }}"
+            PORT="${{ vars.DEPLOY_SSH_PORT || 22 }}"
+
+            ssh -i ~/.ssh/deploy_key -p ${PORT} ${USER}@${HOST} "mkdir -p ${REMOTE_DIR}"
+            scp -i ~/.ssh/deploy_key -P ${PORT} ${APK_PATH} ${USER}@${HOST}:${REMOTE_DIR}/app-release.apk
+
+            DOWNLOAD_URL="${{ vars.APK_SERVE_URL }}/${{ github.event.inputs.version }}/app-release.apk"
+            echo "✅ Uploaded to file server"
+            rm -f ~/.ssh/deploy_key
+          else
+            echo "❌ No distribution platform configured"
+            exit 1
+          fi
+
+          echo "download_url=${DOWNLOAD_URL}" >> $GITHUB_OUTPUT
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "✅ 分发完成!"
+          echo "📱 下载地址: ${DOWNLOAD_URL}"
+          echo "════════════════════════════════════════"
+
+  # ─── production: 上传到 Google Play ───
+  deploy-production:
+    if: github.event.inputs.environment == 'production'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    outputs:
+      download_url: ${{ steps.upload.outputs.download_url }}
+    steps:
+      - name: Download AAB
+        uses: actions/download-artifact@v4
+        with:
+          name: android-aab-${{ github.event.inputs.version }}
+          path: aab/
+
+      - name: Upload to Google Play
+        id: upload
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT }}
+          packageName: ${{ vars.ANDROID_PACKAGE_NAME }}
+          releaseFiles: aab/*.aab
+          track: internal
+          status: completed
+
+      - name: Output download link
+        run: |
+          DOWNLOAD_URL="https://play.google.com/store/apps/details?id=${{ vars.ANDROID_PACKAGE_NAME }}"
+          echo "download_url=${DOWNLOAD_URL}" >> $GITHUB_OUTPUT
+          echo ""
+          echo "════════════════════════════════════════"
+          echo "✅ 已提交 Google Play!"
+          echo "📱 商店地址: ${DOWNLOAD_URL}"
+          echo "════════════════════════════════════════"
+
+  # ─── 通知 (附带下载地址) ───
+  notify:
+    needs: [build, deploy-staging, deploy-production]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare content
+        id: content
+        run: |
+          ENV="${{ github.event.inputs.environment }}"
+          if [ "$ENV" == "staging" ]; then
+            DOWNLOAD_URL="${{ needs.deploy-staging.outputs.download_url }}"
+            RESULT="${{ needs.deploy-staging.result }}"
+            TARGET="内部分发"
+          else
+            DOWNLOAD_URL="${{ needs.deploy-production.outputs.download_url }}"
+            RESULT="${{ needs.deploy-production.result }}"
+            TARGET="Google Play"
+          fi
+
+          STATUS="✅ 成功"
+          if [ "$RESULT" != "success" ]; then
+            STATUS="❌ 失败"
+            DOWNLOAD_URL="部署失败, 请检查日志"
+          fi
+
+          echo "status=${STATUS}" >> $GITHUB_OUTPUT
+          echo "download_url=${DOWNLOAD_URL}" >> $GITHUB_OUTPUT
+          echo "target=${TARGET}" >> $GITHUB_OUTPUT
+
+      - name: Send DingTalk notification
+        if: vars.DINGTALK_WEBHOOK != ''
+        run: |
+          curl -s -X POST "${{ vars.DINGTALK_WEBHOOK }}" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"msgtype\": \"markdown\",
+              \"markdown\": {
+                \"title\": \"Android 部署通知\",
+                \"text\": \"## 🤖 Android 部署通知\n\n- **目标**: ${{ steps.content.outputs.target }}\n- **版本**: ${{ github.event.inputs.version }}\n- **包大小**: ${{ needs.build.outputs.apk_size }}\n- **状态**: ${{ steps.content.outputs.status }}\n- **触发人**: ${{ github.actor }}\n\n**📱 下载地址**: ${{ steps.content.outputs.download_url }}\"
+              }
+            }"
+
+      - name: Send Feishu notification
+        if: vars.FEISHU_WEBHOOK != ''
+        run: |
+          curl -s -X POST "${{ vars.FEISHU_WEBHOOK }}" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"msg_type\": \"interactive\",
+              \"card\": {
+                \"header\": { \"title\": { \"tag\": \"plain_text\", \"content\": \"🤖 Android 部署通知\" } },
+                \"elements\": [
+                  {
+                    \"tag\": \"div\",
+                    \"text\": { \"tag\": \"lark_md\", \"content\": \"**目标**: ${{ steps.content.outputs.target }}\n**版本**: ${{ github.event.inputs.version }}\n**状态**: ${{ steps.content.outputs.status }}\n**触发人**: ${{ github.actor }}\" }
+                  },
+                  {
+                    \"tag\": \"action\",
+                    \"actions\": [{
+                      \"tag\": \"button\",
+                      \"text\": { \"tag\": \"plain_text\", \"content\": \"📱 下载 APK\" },
+                      \"url\": \"${{ steps.content.outputs.download_url }}\",
+                      \"type\": \"primary\"
+                    }]
+                  }
+                ]
+              }
+            }"
+
+      - name: Output summary
+        run: |
+          echo ""
+          echo "══════════════════════════════════════════════════"
+          echo "📋 部署摘要"
+          echo "──────────────────────────────────────────────────"
+          echo "  平台:     Android"
+          echo "  目标:     ${{ steps.content.outputs.target }}"
+          echo "  版本:     ${{ github.event.inputs.version }}"
+          echo "  包大小:   ${{ needs.build.outputs.apk_size }}"
+          echo "  状态:     ${{ steps.content.outputs.status }}"
+          echo ""
+          echo "  📱 下载地址: ${{ steps.content.outputs.download_url }}"
+          echo "══════════════════════════════════════════════════"

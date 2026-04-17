@@ -7,6 +7,10 @@
 | 文件 | 作用 | 状态 |
 |------|------|------|
 | [workflows/claude-fix.yml](workflows/claude-fix.yml) | 触发 AI 自动修 bug + 开 draft PR | 🟡 脚本已写, 待启用 |
+| [workflows/deploy-web.yml](workflows/deploy-web.yml) | Web 平台构建 + CDN 部署 + 灰度 | 🟡 脚本已写, 需配置 secrets/vars |
+| [workflows/deploy-ios.yml](workflows/deploy-ios.yml) | iOS 构建 + TestFlight/App Store | 🟡 脚本已写, 需配置证书和 API Key |
+| [workflows/deploy-android.yml](workflows/deploy-android.yml) | Android 构建 + 内部分发/Google Play | 🟡 脚本已写, 需配置 keystore |
+| [workflows/deploy-harmony.yml](workflows/deploy-harmony.yml) | HarmonyOS 构建 + AppGallery | 🟡 脚本已写, 需配置签名和 API |
 | [pull_request_template.md](pull_request_template.md) | 统一 PR 格式, 强制关联 PRD/task | ✅ 创建 PR 时 GitHub 自动应用, 无需启用 |
 
 ---
@@ -110,6 +114,68 @@ workflow 在调用 Claude 时硬性限制:
 | workflow 报 `permission denied` on push | Actions 权限没开 | 回到步骤 2 勾选 Read and write |
 | workflow 报 `ANTHROPIC_API_KEY` 为空 | secret 没配 | 回到步骤 1 添加 |
 | API 额度告警 / 跑崩 | 触发频率过高 / 单次消耗大 | 在 fix.md 限制复杂度, 或在 workflow 加 `if` 条件限制触发 |
+
+---
+
+## Deploy Workflows 启用步骤
+
+部署 workflow 通过 `/deploy` 命令触发, 也可在 GitHub Actions 页面手动触发。
+
+### 通用配置 (所有平台)
+
+1. **通知渠道** (可选):
+   - `Settings` → `Variables` → `Actions` → 添加:
+     - `DINGTALK_WEBHOOK`: 钉钉机器人 webhook URL
+     - `FEISHU_WEBHOOK`: 飞书机器人 webhook URL
+
+2. **环境保护** (production 必须):
+   - `Settings` → `Environments` → 创建 `production` 环境
+   - 添加 `Required reviewers` (至少 1 人审批)
+
+### Web 平台
+
+`Settings` → `Variables` → 添加:
+- `STAGING_URL`: 测试环境地址
+- `PRODUCTION_URL`: 生产环境地址
+
+CDN 上传需在 workflow 里替换 TODO 为实际命令 (阿里云 OSS / AWS S3 / 腾讯云 COS)。
+
+### iOS 平台
+
+`Settings` → `Secrets` → 添加:
+- `IOS_CERTIFICATE_P12`: 证书 base64
+- `IOS_CERTIFICATE_PASSWORD`: 证书密码
+- `APP_STORE_CONNECT_ISSUER_ID`: App Store Connect API Issuer ID
+- `APP_STORE_CONNECT_KEY_ID`: API Key ID
+- `APP_STORE_CONNECT_PRIVATE_KEY`: API Private Key (.p8 内容)
+
+`Settings` → `Variables` → 添加:
+- `IOS_BUNDLE_ID`: Bundle Identifier
+- `IOS_SCHEME`: Xcode Scheme 名
+
+### Android 平台
+
+`Settings` → `Secrets` → 添加:
+- `ANDROID_KEYSTORE_BASE64`: release.keystore 的 base64
+- `ANDROID_KEYSTORE_PASSWORD`: keystore 密码
+- `ANDROID_KEY_ALIAS`: key alias
+- `ANDROID_KEY_PASSWORD`: key 密码
+- `GOOGLE_PLAY_SERVICE_ACCOUNT`: Google Play Service Account JSON (production)
+- `PGYER_API_KEY`: 蒲公英 API Key (staging, 可选)
+
+`Settings` → `Variables` → 添加:
+- `ANDROID_PACKAGE_NAME`: 包名
+
+### HarmonyOS 平台
+
+`Settings` → `Secrets` → 添加:
+- `HARMONY_KEY_ALIAS`: 签名 key alias
+- `HARMONY_KEY_PASSWORD`: key 密码
+- `HARMONY_KEYSTORE_PASSWORD`: keystore 密码
+- `HUAWEI_CLIENT_ID`: AppGallery Connect Client ID (production)
+- `HUAWEI_ACCESS_TOKEN`: AppGallery Connect Access Token (production)
+
+> HarmonyOS CI 环境搭建较复杂 (华为暂无官方 GitHub Action), 建议使用 Docker 镜像或自托管 runner。
 
 ---
 

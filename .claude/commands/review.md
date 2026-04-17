@@ -40,6 +40,16 @@
 - 缺少空状态
 - 缺少网络异常处理
 
+### 7. 国际化 (i18n) 完整性
+- 组件/页面中出现中文硬编码文案 (应通过 `intl.formatMessage` 或 `useIntl` 引用)
+- `message.success/error/warning` 等全局提示使用了硬编码字符串
+- 表单 `placeholder` / `label` / 校验提示未走国际化
+- antd 组件的 `title` / `content` / `okText` / `cancelText` 等 prop 使用了硬编码中文
+- 新增文案未在 `workspace/src/locales/` 对应文件中注册 (有 key 但找不到翻译)
+- 模块专属文案写到了全局 `common.ts` (应放模块自己的 locale 文件)
+
+> 检查方式: 扫描审查范围内所有 `.tsx` / `.ts` 文件, grep 中文字符 (排除注释和 JSDoc), 对每个命中项判断是否已走 i18n。未走国际化的中文文案标为 🔴 Critical (违反 P0 禁止硬编码规则)。
+
 ## 输出格式
 
 按严重程度分类输出:

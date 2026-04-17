@@ -1,0 +1,160 @@
+name: Deploy HarmonyOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: '部署环境'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: '版本号 (如 v1.2.0)'
+        required: true
+        type: string
+
+concurrency:
+  group: deploy-harmony-${{ github.event.inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup HarmonyOS SDK
+        run: |
+          # TODO: 替换为实际的 DevEco SDK 安装步骤
+          # 华为暂未提供官方 GitHub Action, 需自行配置
+          # 方案 1: 使用 Docker 镜像 (推荐)
+          # 方案 2: 手动下载 commandline-tools
+          echo "Setting up HarmonyOS build environment..."
+
+      - name: Build HAP
+        run: |
+          cd harmony
+          # TODO: 替换为实际的构建命令
+          # hvigorw assembleHap \
+          #   --mode module \
+          #   -p product=default \
+          #   -p buildMode=release \
+          #   -p versionName=${{ github.event.inputs.version }}
+          echo "Building HarmonyOS HAP..."
+
+      - name: Sign HAP
+        run: |
+          # TODO: 签名逻辑
+          # hapsigner sign-app \
+          #   -keyAlias "${{ secrets.HARMONY_KEY_ALIAS }}" \
+          #   -keyPwd "${{ secrets.HARMONY_KEY_PASSWORD }}" \
+          #   -keystoreFile harmony/keystore/release.p12 \
+          #   -keystorePwd "${{ secrets.HARMONY_KEYSTORE_PASSWORD }}" \
+          #   -inFile harmony/build/default/outputs/default/entry-default-signed.hap \
+          #   -outFile harmony/build/release.hap
+          echo "Signing HAP..."
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: harmony-hap-${{ github.event.inputs.version }}
+          path: harmony/build/*.hap
+          retention-days: 30
+          if-no-files-found: warn
+
+  deploy-staging:
+    if: github.event.inputs.environment == 'staging'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: harmony-hap-${{ github.event.inputs.version }}
+          path: hap/
+
+      - name: Upload to internal distribution
+        run: |
+          # TODO: 内部分发逻辑
+          echo "✅ Uploaded to internal distribution"
+
+  deploy-production:
+    if: github.event.inputs.environment == 'production'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: harmony-hap-${{ github.event.inputs.version }}
+          path: hap/
+
+      - name: Upload to AppGallery Connect
+        run: |
+          # TODO: 使用 AppGallery Connect API 上传
+          # 文档: https://developer.huawei.com/consumer/cn/doc/development/AppGallery-connect-References/agcapi-upload-0000001158245057
+          # curl -X POST "https://connect-api.cloud.huawei.com/api/publish/v2/upload-url" \
+          #   -H "Authorization: Bearer ${{ secrets.HUAWEI_ACCESS_TOKEN }}" \
+          #   -H "client_id: ${{ secrets.HUAWEI_CLIENT_ID }}" \
+          #   ...
+          echo "✅ Submitted to AppGallery Connect for review"
+
+  notify:
+    needs: [build, deploy-staging, deploy-production]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send DingTalk notification
+        if: vars.DINGTALK_WEBHOOK != ''
+        run: |
+          STATUS="✅ 成功"
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            STATUS="❌ 构建失败"
+          fi
+          TARGET="内部分发"
+          if [ "${{ github.event.inputs.environment }}" == "production" ]; then
+            TARGET="AppGallery"
+          fi
+          curl -s -X POST "${{ vars.DINGTALK_WEBHOOK }}" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"msgtype\": \"markdown\",
+              \"markdown\": {
+                \"title\": \"HarmonyOS 部署通知\",
+                \"text\": \"## 🔷 HarmonyOS 部署通知\n\n- **目标**: ${TARGET}\n- **版本**: ${{ github.event.inputs.version }}\n- **状态**: ${STATUS}\n- **触发人**: ${{ github.actor }}\"
+              }
+            }"
+
+      - name: Send Feishu notification
+        if: vars.FEISHU_WEBHOOK != ''
+        run: |
+          TARGET="内部分发"
+          if [ "${{ github.event.inputs.environment }}" == "production" ]; then
+            TARGET="AppGallery"
+          fi
+          STATUS="✅ 成功"
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            STATUS="❌ 构建失败"
+          fi
+          curl -s -X POST "${{ vars.FEISHU_WEBHOOK }}" \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"msg_type\": \"interactive\",
+              \"card\": {
+                \"header\": { \"title\": { \"tag\": \"plain_text\", \"content\": \"🔷 HarmonyOS 部署通知\" } },
+                \"elements\": [{
+                  \"tag\": \"div\",
+                  \"text\": { \"tag\": \"lark_md\", \"content\": \"**目标**: ${TARGET}\n**版本**: ${{ github.event.inputs.version }}\n**状态**: ${STATUS}\n**触发人**: ${{ github.actor }}\" }
+                }]
+              }
+            }"

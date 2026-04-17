@@ -584,22 +584,31 @@ git add workspace/api-spec/openapi.json workspace/src/types/api.ts <受影响的
 
 ---
 
-## 🧰 扩展命令 (ext-*)
+## 🧰 扩展技能 (ext-* skill 包)
 
-除了八步法的主命令, 项目还提供了一批**按需使用**的扩展命令 (以 `ext-` 前缀区分), 用于代码质量专项审计和日常分析:
+除了八步法的主命令, 项目还提供了一批**按需使用**的扩展技能 (以 `ext-` 前缀区分), 以**包的形式**放在 [`.claude/skills/`](../.claude/skills/) 下, 含 SKILL.md + 确定性脚本 + 参考资料:
 
-| 命令 | 用途 | 典型场景 |
+| 技能 | 用途 | 典型场景 |
 |------|------|---------|
-| `/ext-perf-audit <目录>` | 前端性能审计 (包体积/渲染/网络/内存/首屏) | 页面感觉卡 / 发版前专项优化 |
-| `/ext-a11y-check <目录>` | 无障碍 WCAG 2.1 AA 合规检查 | 需要支持屏幕阅读器 / 键盘操作 / 合规要求 |
-| `/ext-dep-audit` | 依赖安全与健康度审计 (漏洞/过时/冗余/许可证) | 季度依赖巡检 / 安全告警响应 |
-| `/ext-changelog [--since]` | 可读的变更影响报告 (按模块聚合) | 周报 / 交接 / 复盘 (不同于 `/release` 的发版 changelog) |
+| [ext-perf-audit](../.claude/skills/ext-perf-audit/) | 前端性能审计 (包体积/渲染/网络/内存/首屏) | 页面感觉卡 / 发版前专项优化 |
+| [ext-a11y-check](../.claude/skills/ext-a11y-check/) | 无障碍 WCAG 2.1 AA 合规检查 | 需要支持屏幕阅读器 / 键盘操作 / 合规要求 |
+| [ext-dep-audit](../.claude/skills/ext-dep-audit/) | 依赖安全与健康度审计 (漏洞/过时/冗余/许可证) | 季度依赖巡检 / 安全告警响应 |
+| [ext-changelog](../.claude/skills/ext-changelog/) | 可读的变更影响报告 (按模块聚合) | 周报 / 交接 / 复盘 (不同于 `/release` 的发版 changelog) |
 
-**命名约定**: `ext-` 前缀 = 扩展命令, 非八步法主流程。和主命令一样放在 `.claude/commands/` 下, 用 `/ext-xxx` 调用。
+**命令 vs 技能包的区别**:
+
+| | commands/ 单文件 | skills/ 包形式 |
+|---|---|---|
+| 位置 | `.claude/commands/*.md` | `.claude/skills/<name>/SKILL.md` (+ scripts/ + references/) |
+| 能力 | 纯 prompt 模板 | 可跑确定性脚本 (度量/git/pnpm) + 按需加载大段参考资料 |
+| 触发 | 显式输入 `/xxx` | 显式输入 或 AI 根据 description 自动调用 |
+| 适合 | 思考类工作流 (/prd /plan /code) | 工具类审计 (要真实数据) |
+
+**ext- 命名约定**: 非八步法主流程, 按需使用。详见 [`.claude/skills/README.md`](../.claude/skills/README.md)。
 
 **什么时候用**:
 - 主命令 (`/prd` `/code` `/test` ...) 是**必走流程**, 按八步法跑
-- 扩展命令是**可选专项**, 出现对应场景再用, 不必每次都跑
+- 扩展技能是**可选专项**, 出现对应场景再用, 不必每次都跑
 
 ---
 
@@ -730,4 +739,5 @@ docs/prds/x.md       docs/tasks/x.json    workspace/src/..    workspace/tests/..
 | 编码风格 | [../.claude/rules/coding-style.md](../.claude/rules/coding-style.md) |
 | CI/CD Workflows | [../.github/workflows/](../.github/workflows/) — deploy-web / deploy-ios / deploy-android / deploy-harmony |
 | 技术栈 | [../.claude/rules/tech-stack.md](../.claude/rules/tech-stack.md) |
-| 全部命令 | [../.claude/commands/](../.claude/commands/) — 主流程: `/prd` `/prd-check` `/plan` `/plan-check` `/code` `/test` `/review` `/bug-check` `/fix` `/release` `/build` `/deploy` `/start` · 扩展: `/ext-perf-audit` `/ext-a11y-check` `/ext-dep-audit` `/ext-changelog` |
+| 全部命令 | 主流程 [`../.claude/commands/`](../.claude/commands/): `/prd` `/prd-check` `/plan` `/plan-check` `/code` `/test` `/review` `/bug-check` `/fix` `/release` `/build` `/deploy` `/start` |
+| 扩展技能包 | [`../.claude/skills/`](../.claude/skills/) — `ext-perf-audit` / `ext-a11y-check` / `ext-dep-audit` / `ext-changelog` |

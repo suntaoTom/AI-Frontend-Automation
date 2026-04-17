@@ -612,6 +612,25 @@ git add workspace/api-spec/openapi.json workspace/src/types/api.ts <受影响的
 
 ---
 
+## 🤖 子代理 (并行/保护 context)
+
+项目提供 3 个 sub-agent, 由主命令用 `Agent` 工具 spawn, 跑在**独立 context** 里, 支持并行:
+
+| 代理 | 职责 | 典型 spawn 场景 |
+|------|------|----------------|
+| [test-writer](../.claude/agents/test-writer.md) | 按 `@rules` 生成测试 + 跑验证 | `/code` 完成多文件后 / `/test` 多模块并行 |
+| [code-reviewer](../.claude/agents/code-reviewer.md) | 只读审查, 按规则扫问题 | `/review` 拆分大目录 / 提 PR 前第二视角 |
+| [bug-fixer](../.claude/agents/bug-fixer.md) | 修单个已分诊的 true-bug | `/fix` 处理多 bug 报告时并行 |
+
+**什么时候主 agent 会 spawn**:
+- 任务可独立并行 (5 个 bug 一起修比串行快 5 倍)
+- 怕污染主 context (大目录审查读文件读很多)
+- 需要独立视角 (主 agent 刚写完代码, 让 reviewer 独立看)
+
+**用户视角**: 通常不用直接调 agent — 主命令会自己判断什么时候 spawn。想手动调用看 [.claude/agents/README.md](../.claude/agents/README.md)。
+
+---
+
 ## 🪝 自动化 Hooks (静默守护)
 
 项目内置了 3 个 hooks (配置在 `.claude/settings.json`), 在后台自动运行, 不需要手动触发:
@@ -737,6 +756,9 @@ docs/prds/x.md       docs/tasks/x.json    workspace/src/..    workspace/tests/..
 | 代码注释规范 | [../.claude/rules/file-docs.md](../.claude/rules/file-docs.md) |
 | 禁止硬编码 | [../.claude/rules/no-hardcode.md](../.claude/rules/no-hardcode.md) |
 | 编码风格 | [../.claude/rules/coding-style.md](../.claude/rules/coding-style.md) |
+| 测试规范 | [../.claude/rules/testing.md](../.claude/rules/testing.md) |
+| 子代理约定 | [../.claude/agents/README.md](../.claude/agents/README.md) |
+| .claude 总索引 | [../.claude/README.md](../.claude/README.md) |
 | CI/CD Workflows | [../.github/workflows/](../.github/workflows/) — deploy-web / deploy-ios / deploy-android / deploy-harmony |
 | 技术栈 | [../.claude/rules/tech-stack.md](../.claude/rules/tech-stack.md) |
 | 全部命令 | 主流程 [`../.claude/commands/`](../.claude/commands/): `/prd` `/prd-check` `/plan` `/plan-check` `/code` `/test` `/review` `/bug-check` `/fix` `/release` `/build` `/deploy` `/start` |

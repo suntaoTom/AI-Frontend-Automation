@@ -228,6 +228,50 @@ pnpm prd:import requirements/登录需求.docx
 
 ---
 
+### Step 3.5 — Visual QA 视觉对比 (有设计截图时)
+
+`/code` 全部任务完成后会**自动触发**一次截图对比。也可以随时手动跑：
+
+```bash
+/visual-qa
+
+# 指定对比用的参考图
+/visual-qa docs/designs/screenshots/reference/xiaoguotu.png
+```
+
+**脚本会自动做**：
+
+1. 检测 dev server 是否在 `http://localhost:8000` 运行
+   - **运行中** → 直接用 Playwright 截图
+   - **未运行** → 自动 `pnpm dev` 启动，截图完毕自动关闭
+2. ImageMagick 像素对比，分区域（TopBar / Pipeline / Board）分别打分
+3. 生成三级判定：
+
+   | 级别 | 检查项 | 不通过时 |
+   |------|--------|---------|
+   | **P0 结构** | TopBar + Pipeline 区域 RMSE < 0.35 | **必须修复，阻塞继续** |
+   | **P1 视觉 Token** | 整体 RMSE < 0.25（颜色/间距/圆角） | 建议修复 |
+   | **P2 像素级** | 整体 RMSE < 0.15 | 记录，不阻塞 |
+
+4. 产出文件到 `docs/designs/screenshots/actual/`：
+   - `actual-web.png` — 本次截图
+   - `diff.png` — 红色高亮差异区域
+   - `side-by-side.png` — 左右拼接对比图
+   - `qa-result.json` — 结构化指标数据
+
+**你要做**：
+- 打开 `docs/designs/screenshots/actual/side-by-side.png` 看左右对比
+- P0/P1 有差异时 AI 会自动定位到 `.less` / `.module.css` / `.tsx` 修复，最多 3 轮
+- P2 差异记录在 JSON 里，不影响进度
+
+**设计截图放哪**：把设计稿导出的截图放到 `docs/designs/screenshots/reference/` 即可。
+
+**常见卡点**：
+- ❓ RMSE 偏高但视觉上差不多 → 正常，页面有动态内容或未登录状态会拉高 RMSE，以 side-by-side 为准
+- ❓ dev server 端口不是 8000 → 修改 `docs/designs/screenshots/run-visual-qa.sh` 里的 `PORT` 变量
+
+---
+
 ### Step 4 — 生成测试
 
 ```bash

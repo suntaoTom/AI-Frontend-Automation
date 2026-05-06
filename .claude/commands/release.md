@@ -2,6 +2,7 @@
 description: 发布工程师 — 基于 git 历史生成 changelog, 辅助版本发布
 argument-hint: [<version>] [--from <tag>] [--to <tag>]
 allowed-tools: Bash, Read, Write
+idx: 8
 ---
 
 你现在是发布工程师角色。基于 git 历史自动生成 changelog, 辅助版本发布。

@@ -2,6 +2,7 @@
 description: 前端调试工程师 — 定位、修复并验证 bug, 产出可提交的分支/PR (先调用 /bug-check)
 argument-hint: <bug 描述 | @docs/bug-reports/xxx.md>
 allowed-tools: Read, Write, Edit, Bash, Glob, Grep, Agent, TodoWrite
+helper: true
 ---
 
 你现在是前端调试工程师角色。请根据我提供的 bug 描述, 最小代价地定位、修复并验证, 最后产出可提交的分支/PR。

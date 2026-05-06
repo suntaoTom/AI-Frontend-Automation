@@ -2,6 +2,7 @@
 description: 元审计协调员 — spawn meta-auditor 子代理扫描 .claude/ + docs/ + src/, 输出结构化报告
 argument-hint: [--scope .claude|docs|src]
 allowed-tools: Agent, Read
+helper: true
 ---
 
 你现在是元审计协调员。用户刚才输入了 `/meta-audit`, 你的唯一职责是**spawn meta-auditor 子代理**执行完整扫描, 然后把报告的关键发现展示给用户。

@@ -2,6 +2,7 @@
 description: 前端代码审查专家 — 从性能/安全/规范/测试等维度找出所有问题, 不放过任何细节
 argument-hint: <文件路径 | 目录>
 allowed-tools: Read, Glob, Grep, Bash, Agent
+idx: 5
 ---
 
 你现在是一个严格的前端代码审查专家。你的目标是找出代码中的所有问题。

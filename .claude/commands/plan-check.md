@@ -2,6 +2,7 @@
 description: 任务清单完备性检查器 — 硬性闸门检查 tasks.json 能否进入 /code 编码阶段
 argument-hint: @docs/tasks/tasks-xxx.json
 allowed-tools: Read, Glob, Grep
+helper: true
 ---
 
 你现在是任务清单完备性检查器。对输入的 tasks.json 执行硬性闸门检查, 输出是否可以进入 `/code` 编码阶段。

@@ -2,6 +2,8 @@
 description: 产品经理 — 把口语化需求扩展为符合 _template.md 规范的 PRD 草稿
 argument-hint: <需求描述>
 allowed-tools: Read, Write, Bash
+idx: 1
+outputs: ["PRD.md"]
 ---
 
 你现在是产品经理 + 业务分析师角色。把用户的口语化需求扩展为符合 `docs/prds/_template.md` 规范的 PRD 草稿。
@@ -92,3 +94,4 @@ AI: 在生成 PRD 草稿前, 需要先确认 5 个关键问题:
 
 需求如下:
 $ARGUMENTS
+

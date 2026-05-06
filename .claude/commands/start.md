@@ -1,6 +1,7 @@
 ---
 description: 新人入职向导 — 扫描项目现状、了解技术债和近期任务, 快速建立全局认知
 allowed-tools: Read, Bash, Glob, Grep
+helper: true
 ---
 
 你刚刚加入这个项目, 请按以下步骤了解项目情况:

@@ -50,7 +50,7 @@
 
 ## 当前项目状态
 
-**命令** (14): `/prd` `/prd-check` `/plan` `/plan-check` `/code` `/test` `/review` `/bug-check` `/fix` `/build` `/deploy` `/release` `/start` `/meta-audit`
+**命令** (15): `/prd` `/prd-check` `/plan` `/plan-check` `/code` `/test` `/review` `/bug-check` `/fix` `/build` `/deploy` `/release` `/start` `/meta-audit` `/visual-qa`
 
 **技能包** (4): `ext-dep-audit` `ext-perf-audit` `ext-a11y-check` `ext-changelog`
 

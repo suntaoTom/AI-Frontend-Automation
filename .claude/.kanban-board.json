@@ -1,24 +1,24 @@
 {
-  "columns": [
-    {
-      "id": "ready",
-      "title": "Ready",
-      "color": "var(--blue)"
-    },
-    {
-      "id": "running",
-      "title": "Running",
-      "color": "var(--green)"
-    },
-    {
-      "id": "done",
-      "title": "Done",
-      "color": "var(--teal)"
-    }
-  ],
+  "columns": [],
   "cards": [
     {
       "id": "card-1777726716751",
+      "col": "backlog",
+      "title": "New card",
+      "desc": "",
+      "status": "idle",
+      "bootCommands": []
+    },
+    {
+      "id": "card-1778052067349",
+      "col": "backlog",
+      "title": "New card",
+      "desc": "",
+      "status": "idle",
+      "bootCommands": []
+    },
+    {
+      "id": "card-1778052068833",
       "col": "backlog",
       "title": "New card",
       "desc": "",

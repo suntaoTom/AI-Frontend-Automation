@@ -25,17 +25,17 @@ DIFF_IMG="$ACTUAL_DIR/diff.png"
 SIDE_BY_SIDE="$ACTUAL_DIR/side-by-side.png"
 TARGET_SIZE="1440x900"
 PORT=8000
-DEV_SERVER_STARTED=false
 
 mkdir -p "$ACTUAL_DIR"
 
-# ── 颜色输出 ──────────────────────────────────────────────────────────────────
+# ── 颜色输出（全部输出到 stderr，避免污染函数返回值）─────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 BLUE='\033[0;34m'; NC='\033[0m'; BOLD='\033[1m'
 
-log()  { echo -e "${BLUE}[visual-qa]${NC} $*"; }
-warn() { echo -e "${YELLOW}⚠️ ${NC} $*"; }
-fail() { echo -e "${RED}❌${NC} $*"; }
+log()  { echo -e "${BLUE}[visual-qa]${NC} $*" >&2; }
+ok()   { echo -e "${GREEN}✅${NC} $*" >&2; }
+warn() { echo -e "${YELLOW}⚠️ ${NC} $*" >&2; }
+fail() { echo -e "${RED}❌${NC} $*" >&2; }
 
 # ── 检查依赖 ──────────────────────────────────────────────────────────────────
 check_deps() {
@@ -43,32 +43,34 @@ check_deps() {
     warn "ImageMagick 未安装，正在安装..."
     brew install imagemagick
   fi
-  if ! npx --no playwright --version &>/dev/null 2>&1; then
-    warn "Playwright 未安装，正在安装..."
-    cd "$WORKSPACE_DIR" && pnpm add -D playwright && npx playwright install chromium
-    cd "$SCRIPT_DIR"
+  if ! command -v npx &>/dev/null; then
+    fail "npx 未找到，请先安装 Node.js"
+    exit 1
   fi
 }
 
 # ── 截图 ──────────────────────────────────────────────────────────────────────
 take_screenshot() {
-  # 检查 dev server 是否已运行
-  if curl -s "http://localhost:$PORT" &>/dev/null; then
-    log "检测到 dev server 已在 port $PORT 运行，直接截图..."
-  else
-    log "dev server 未运行，启动中..."
-    cd "$ROOT_DIR"
-    pnpm dev &>/dev/null &
-    DEV_PID=$!
-    DEV_SERVER_STARTED=true
+  # 清空整个 actual/ 目录，确保所有产出（截图/diff/JSON）都是本次新生成的
+  rm -f "$ACTUAL_DIR"/*
 
-    log "等待 dev server 就绪 (port $PORT, 最多 30s)..."
-    for i in $(seq 1 30); do
-      curl -s "http://localhost:$PORT" &>/dev/null && break
-      sleep 1
-    done
-    cd "$SCRIPT_DIR"
-  fi
+  local dev_pid="" dev_started=false
+
+  # 杀掉可能残留的旧进程，确保拿到最新代码
+  lsof -ti tcp:$PORT | xargs kill -9 2>/dev/null || true
+
+  log "启动 dev server（当前源码）..."
+  cd "$ROOT_DIR"
+  pnpm dev &>/dev/null &
+  dev_pid=$!
+  dev_started=true
+
+  log "等待 dev server 就绪 (port $PORT, 最多 30s)..."
+  for i in $(seq 1 30); do
+    curl -s "http://localhost:$PORT" &>/dev/null && break
+    sleep 1
+  done
+  cd "$SCRIPT_DIR"
 
   log "用 Playwright 截图 http://localhost:$PORT ..."
   cd "$WORKSPACE_DIR"
@@ -78,14 +80,20 @@ take_screenshot() {
     --viewport-size "1440,900" \
     --wait-for-timeout 2000 \
     "http://localhost:$PORT" \
-    "$ACTUAL_IMG" 2>/dev/null
-  cd "$SCRIPT_DIR"
+    "$ACTUAL_IMG" >&2
 
-  # 关闭自动启动的 dev server
-  if [[ "$DEV_SERVER_STARTED" == "true" ]]; then
-    kill "$DEV_PID" 2>/dev/null || true
+  # 关闭 dev server
+  if [[ "$dev_started" == "true" && -n "$dev_pid" ]]; then
+    kill "$dev_pid" 2>/dev/null || true
     log "已关闭 dev server"
   fi
+
+  # 验证截图确实产出，否则硬性失败
+  if [ ! -f "$ACTUAL_IMG" ]; then
+    fail "截图失败，文件不存在: $ACTUAL_IMG"
+    exit 1
+  fi
+  log "截图完成: $ACTUAL_IMG ($(date '+%H:%M:%S'))"
 }
 
 # ── 图像对比 ──────────────────────────────────────────────────────────────────
@@ -102,18 +110,25 @@ compare_images() {
 
   log "对比图像（统一缩放至 $TARGET_SIZE）..."
 
-  magick "$REFERENCE" -resize "${TARGET_SIZE}!" /tmp/vqa-ref.png 2>/dev/null
+  magick "$REFERENCE"  -resize "${TARGET_SIZE}!" /tmp/vqa-ref.png 2>/dev/null
   magick "$ACTUAL_IMG" -resize "${TARGET_SIZE}!" /tmp/vqa-act.png 2>/dev/null
 
-  RMSE_RAW=$(magick compare -metric RMSE /tmp/vqa-ref.png /tmp/vqa-act.png "$DIFF_IMG" 2>&1 || true)
-  RMSE=$(echo "$RMSE_RAW" | grep -oE '[0-9]+\.[0-9]+' | tail -1 || echo "1.0")
+  # magick compare 输出格式: "7625.86 (0.116363)" — 括号内是归一化值 (0~1)
+  extract_norm_rmse() { grep -oE '\([0-9.]+\)' | tr -d '()' | tail -1; }
+
+  local raw
+  raw=$(magick compare -metric RMSE /tmp/vqa-ref.png /tmp/vqa-act.png "$DIFF_IMG" 2>&1 || true)
+  RMSE=$(echo "$raw" | extract_norm_rmse || echo "1.0")
+  [ -z "$RMSE" ] && RMSE="1.0"
 
   compare_region() {
     local crop="$1"
     magick /tmp/vqa-ref.png -crop "$crop" +repage /tmp/vqa-r-region.png 2>/dev/null
     magick /tmp/vqa-act.png -crop "$crop" +repage /tmp/vqa-a-region.png 2>/dev/null
-    magick compare -metric RMSE /tmp/vqa-r-region.png /tmp/vqa-a-region.png /tmp/vqa-diff-region.png 2>&1 \
-      | grep -oE '[0-9]+\.[0-9]+' | tail -1 || echo "1.0"
+    local rraw val
+    rraw=$(magick compare -metric RMSE /tmp/vqa-r-region.png /tmp/vqa-a-region.png /tmp/vqa-diff-region.png 2>&1 || true)
+    val=$(echo "$rraw" | grep -oE '\([0-9.]+\)' | tr -d '()' | tail -1)
+    echo "${val:-1.0}"
   }
 
   RMSE_TOPBAR=$(compare_region "1440x48+0+0")
@@ -180,7 +195,7 @@ print_report() {
   local p0_icon="✅"
   [[ "$p0_topbar" == "false" || "$p0_pipeline" == "false" ]] && p0_icon="❌"
   echo -e "$p0_icon P0 结构"
-  echo    "     TopBar    RMSE=$rmse_topbar  阈值<0.35  $( [[ "$p0_topbar" == "true" ]] && echo '✅' || echo '❌ 必须修复' )"
+  echo    "     TopBar    RMSE=$rmse_topbar  阈值<0.35  $( [[ "$p0_topbar"   == "true" ]] && echo '✅' || echo '❌ 必须修复' )"
   echo    "     Pipeline  RMSE=$rmse_pipeline  阈值<0.35  $( [[ "$p0_pipeline" == "true" ]] && echo '✅' || echo '❌ 必须修复' )"
 
   local p1_icon="✅"; [[ "$p1" == "false" ]] && p1_icon="⚠️ "

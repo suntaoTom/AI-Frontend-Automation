@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Non-markdown files provided by backend or product teams (`.docx / .xlsx / .pptx`, etc.) are converted to markdown by the [prd-import skill](../../../.claude/skills/prd-import/SKILL.md) and deposited here, serving as input material for the `/prd` command.
+Non-markdown files provided by backend or product teams (`.docx / .xlsx / .pptx`, etc.) are converted to markdown by the [prd-import skill](../../../.agents/skills/prd-import/SKILL.md) and deposited here, serving as input material for the `/prd` command.
 
 ## Flow
 

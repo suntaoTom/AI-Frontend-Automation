@@ -1,0 +1,39 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'C:\\Users\\hyperchain\\Desktop\\claude-code-workflow\\.codex\\hooks\\pre-commit-check.sh'",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'C:\\Users\\hyperchain\\Desktop\\claude-code-workflow\\.codex\\hooks\\check-hardcode.sh'",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "ConversationStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'C:\\Users\\hyperchain\\Desktop\\claude-code-workflow\\.codex\\hooks\\check-tasks-status.sh'",
+            "timeout": 5000
+          }
+        ]
+      }
+    ]
+  }
+}

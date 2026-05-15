@@ -125,9 +125,9 @@ pnpm prd:import requirements/login-requirements.docx
 | `.pdf` | Directly `/prd @<file>.pdf` (Claude Code native support) |
 | Images (`.png` / `.jpg`) | Directly `/prd @<file>.png` (multimodal recognition) |
 | `.doc` / `.xls` / `.ppt` (old formats) | Save as new format (`.docx` etc.) in Word/WPS first, then convert |
-| **Online docs** (Feishu/Notion/Yuque/Tencent Docs/Google Docs) | Export `.md` or `.docx` from the platform, then handle as per the corresponding row above. Notion / Yuque export directly to `.md` is the easiest. See [prd-import/references/formats.md](../.claude/skills/prd-import/references/formats.md#online-docs) |
+| **Online docs** (Feishu/Notion/Yuque/Tencent Docs/Google Docs) | Export `.md` or `.docx` from the platform, then handle as per the corresponding row above. Notion / Yuque export directly to `.md` is the easiest. See [prd-import/references/formats.md](../.agents/skills/prd-import/references/formats.md#online-docs) |
 
-Before using `prd:import` for the first time, install dependencies once: `cd workspace && pnpm install` (automatically installs mammoth + xlsx). See [.claude/skills/prd-import/SKILL.md](../.claude/skills/prd-import/SKILL.md) for details.
+Before using `prd:import` for the first time, install dependencies once: `cd workspace && pnpm install` (automatically installs mammoth + xlsx). See [.agents/skills/prd-import/SKILL.md](../.agents/skills/prd-import/SKILL.md) for the Codex skill entrypoint.
 
 #### When using text / existing md directly
 
@@ -610,32 +610,32 @@ git add workspace/api-spec/openapi.json workspace/src/types/api.ts <affected-fil
 | Release all platforms to production simultaneously | `/deploy all --env production` |
 | Production rollback | `/deploy web --env production --rollback` |
 | First deployment, don't know how to configure | `/deploy` → AI outputs config template |
-| CLAUDE.md changes not taking effect | Ctrl+D to restart claude session |
+| AGENTS.md changes not taking effect | Restart the Codex session |
 | Completely stuck | Exit and restart session, 90% of mysterious issues are solved by restart |
 
 ---
 
 ## 🧰 Extension Skills (ext-* skill packages)
 
-Beyond the main commands of the Eight-Step Method, the project also provides a set of **on-demand** extension skills (distinguished by the `ext-` prefix), organized **as packages** under [`.claude/skills/`](../.claude/skills/), containing SKILL.md + deterministic scripts + reference materials:
+Beyond the main commands of the Eight-Step Method, the project also provides a set of **on-demand** extension skills (distinguished by the `ext-` prefix), organized **as packages** under [`.agents/skills/`](../.agents/skills/), containing SKILL.md + deterministic scripts + reference materials for Codex:
 
 | Skill | Purpose | Typical Scenario |
 |------|------|---------|
-| [ext-perf-audit](../.claude/skills/ext-perf-audit/) | Frontend performance audit (bundle size/rendering/network/memory/first paint) | Page feels sluggish / pre-release optimization |
-| [ext-a11y-check](../.claude/skills/ext-a11y-check/) | Accessibility WCAG 2.1 AA compliance check | Screen reader support / keyboard navigation / compliance requirements |
-| [ext-dep-audit](../.claude/skills/ext-dep-audit/) | Dependency security & health audit (vulnerabilities/outdated/redundant/licenses) | Quarterly dependency audit / security alert response |
-| [ext-changelog](../.claude/skills/ext-changelog/) | Human-readable change impact report (aggregated by module) | Weekly summary / handoff / retrospective (different from `/release`'s versioned changelog) |
+| [ext-perf-audit](../.agents/skills/ext-perf-audit/) | Frontend performance audit (bundle size/rendering/network/memory/first paint) | Page feels sluggish / pre-release optimization |
+| [ext-a11y-check](../.agents/skills/ext-a11y-check/) | Accessibility WCAG 2.1 AA compliance check | Screen reader support / keyboard navigation / compliance requirements |
+| [ext-dep-audit](../.agents/skills/ext-dep-audit/) | Dependency security & health audit (vulnerabilities/outdated/redundant/licenses) | Quarterly dependency audit / security alert response |
+| [ext-changelog](../.agents/skills/ext-changelog/) | Human-readable change impact report (aggregated by module) | Weekly summary / handoff / retrospective (different from `/release`'s versioned changelog) |
 
 **Difference between commands and skill packages**:
 
 | | commands/ single file | skills/ package form |
 |---|---|---|
-| Location | `.claude/commands/*.md` | `.claude/skills/<name>/SKILL.md` (+ scripts/ + references/) |
+| Location | `.claude/commands/*.md` | `.agents/skills/<name>/SKILL.md` (+ scripts/ + references/) |
 | Capability | Pure prompt templates | Can run deterministic scripts (metrics/git/pnpm) + load large reference materials on demand |
 | Trigger | Explicit `/xxx` input | Explicit input or AI auto-invocation based on description |
 | Suitable for | Thinking-type workflows (/prd /plan /code) | Tool-type audits (requires real data) |
 
-**`ext-` naming convention**: Not part of the main Eight-Step flow, use on demand. See [`.claude/skills/README.md`](../.claude/skills/README.md).
+**`ext-` naming convention**: Not part of the main Eight-Step flow, use on demand. See [`.agents/skills/README.md`](../.agents/skills/README.md).
 
 **When to use**:
 - Main commands (`/prd` `/code` `/test` ...) are **required flow** — run per the Eight-Step Method
@@ -649,23 +649,23 @@ The project provides 4 sub-agents, spawned by the main command using the `Agent`
 
 | Agent | Responsibility | Typical Spawn Scenario |
 |------|------|----------------|
-| [test-writer](../.claude/agents/test-writer.md) | Generate tests per `@rules` + run validation | After `/code` completes multiple files / parallel `/test` for multiple modules |
-| [code-reviewer](../.claude/agents/code-reviewer.md) | Read-only review, scan for issues per rules | `/review` splitting large directories / independent second-opinion before PR |
-| [bug-fixer](../.claude/agents/bug-fixer.md) | Fix a single triaged true-bug | `/fix` handling multiple bug reports in parallel |
-| [meta-auditor](../.claude/agents/meta-auditor.md) | God's-eye scan of the entire framework, find inconsistencies/drift/dead links, output read-only observation report | Triggered by `/meta-audit` command |
+| [test-writer](../.codex/agents/test-writer.toml) | Generate tests per `@rules` + run validation | After `/code` completes multiple files / parallel `/test` for multiple modules |
+| [code-reviewer](../.codex/agents/code-reviewer.toml) | Read-only review, scan for issues per rules | `/review` splitting large directories / independent second-opinion before PR |
+| [bug-fixer](../.codex/agents/bug-fixer.toml) | Fix a single triaged true-bug | `/fix` handling multiple bug reports in parallel |
+| [meta-auditor](../.codex/agents/meta-auditor.toml) | God's-eye scan of the entire framework, find inconsistencies/drift/dead links, output read-only observation report | Triggered by `/meta-audit` command |
 
 **When the main agent will spawn**:
 - Tasks can be done in parallel independently (5 bugs fixed in parallel is 5x faster than serial)
 - Afraid of polluting main context (large directory review reads many files)
 - Needs an independent perspective (main agent just wrote the code, let reviewer look independently)
 
-**User perspective**: Usually you don't need to call agents directly — the main command will decide when to spawn. For manual invocation, see [.claude/agents/README.md](../.claude/agents/README.md).
+**User perspective**: Usually you don't need to call agents directly — the main command will decide when to spawn. For manual invocation, see [.codex/agents/README.md](../.codex/agents/README.md).
 
 ---
 
 ## 🪝 Automation Hooks (Silent guardians)
 
-The project has 3 built-in hooks (configured in `.claude/settings.json`) that run automatically in the background — no manual triggering needed:
+The project has 3 built-in hooks for Codex (configured in `.codex/hooks.json`) that run automatically in the background when the host supports the corresponding event — no manual triggering needed:
 
 | Hook | Trigger | What it does | Why it's needed |
 |------|---------|--------|-----------|
@@ -715,8 +715,8 @@ As the project grows, commands/skills/agents/rules reference each other, and rul
 | Dimension | What it scans |
 |------|-------|
 | `rule-violations` | Static rule violations (hardcoded Chinese / inline styles / any types / hand-written API types) |
-| `doc-drift` | Spec docs vs actual code inconsistencies (CLAUDE.md says A but code does B) |
-| `internal-consistency` | Internal consistency in `.claude/` and `docs/` (do command/skill lists match the README?) |
+| `doc-drift` | Spec docs vs actual code inconsistencies (AGENTS.md says A but code does B) |
+| `internal-consistency` | Internal consistency in `.agents/`, `.codex/`, `.claude/`, and `docs/` (do command/skill/agent lists match the README?) |
 | `traceability` | Whether the PRD → task → source → test traceability chain is broken |
 | `dead-links` | Whether md relative links point to non-existent files |
 | `orphaned-assets` | Files that exist but are not referenced by anyone |
@@ -728,7 +728,7 @@ As the project grows, commands/skills/agents/rules reference each other, and rul
 - **Read-only observation, no auto-fix** — agent tool permissions restricted to `[Read, Grep, Glob, Write]`, and Write is only allowed for the report path
 - **Manual trigger, no scheduled runs** — reports no one reads are just noise
 - **Reports are immutable** — next scan auto-compares trends, don't check off "handled" in old reports
-- **Adopting suggestions goes through normal PR flow** — change rules in `.claude/rules/`, change code via `/fix`, open GitHub issues for discussion items
+- **Adopting suggestions goes through normal PR flow** — change rules in `.claude/rules/`, change Codex runtime config in `.codex/`, change skills in `.agents/skills/`, change code via `/fix`, open GitHub issues for discussion items
 
 **Suggested frequency**: After milestones / every 1-2 weeks / after adding new mechanisms. See [retrospectives/README.md](retrospectives/README.md).
 
@@ -818,7 +818,7 @@ One-step shortcut:
 
 | Want to know | Look here |
 |--------|--------|
-| Overall conventions | [../CLAUDE.md](../CLAUDE.md) |
+| Overall conventions | [../AGENTS.md](../AGENTS.md) |
 | How to write a PRD | [prds/_template.md](prds/_template.md) |
 | How to review a PRD | [prds/REVIEW.md](prds/REVIEW.md) |
 | QA AI testing integration | [bug-reports/README.md](bug-reports/README.md) |
@@ -829,11 +829,11 @@ One-step shortcut:
 | No hardcoding rule | [../.claude/rules/no-hardcode.md](../.claude/rules/no-hardcode.md) |
 | Coding style | [../.claude/rules/coding-style.md](../.claude/rules/coding-style.md) |
 | Testing conventions | [../.claude/rules/testing.md](../.claude/rules/testing.md) |
-| Sub-agent conventions | [../.claude/agents/README.md](../.claude/agents/README.md) |
-| .claude master index | [../.claude/README.md](../.claude/README.md) |
+| Codex sub-agent conventions | [../.codex/agents/README.md](../.codex/agents/README.md) |
+| Codex runtime index | [../.codex/README.md](../.codex/README.md) |
 | CI/CD Workflows | [../.github/workflows/](../.github/workflows/) — deploy-web / deploy-ios / deploy-android / deploy-harmony |
 | Tech stack | [../.claude/rules/tech-stack.md](../.claude/rules/tech-stack.md) |
 | Engineering retrospective reports | [retrospectives/README.md](retrospectives/README.md) — read-only observations from `/meta-audit`, immutable snapshots |
 | Architecture Decision Records (ADR) | [DECISIONS.md](DECISIONS.md) — background/rationale/alternatives for major framework decisions |
 | All commands | Main flow [`../.claude/commands/`](../.claude/commands/): `/prd` `/prd-check` `/plan` `/plan-check` `/code` `/test` `/review` `/bug-check` `/fix` `/release` `/build` `/deploy` `/start` `/meta-audit` |
-| Extension skill packages | [`../.claude/skills/`](../.claude/skills/) — `ext-perf-audit` / `ext-a11y-check` / `ext-dep-audit` / `ext-changelog` |
+| Extension skill packages | [`../.agents/skills/`](../.agents/skills/) — `ext-perf-audit` / `ext-a11y-check` / `ext-dep-audit` / `ext-changelog` |
